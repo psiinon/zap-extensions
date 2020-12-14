@@ -16,7 +16,7 @@ description = "A common library, for use by other add-ons."
 zapAddOn {
     addOnName.set("Common Library")
     addOnStatus.set(AddOnStatus.RELEASE)
-    zapVersion.set("2.9.0")
+    zapVersion.set("2.10.0")
 
     manifest {
         author.set("ZAP Dev Team")

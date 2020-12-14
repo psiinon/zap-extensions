@@ -21,17 +21,34 @@ package org.zaproxy.zap.extension.simpleexample;
 
 import java.awt.CardLayout;
 import java.awt.Font;
+import java.awt.GridBagLayout;
 import java.io.File;
+import java.lang.reflect.Method;
 import java.nio.file.Files;
 import javax.swing.ImageIcon;
+import javax.swing.JCheckBox;
+import javax.swing.JLabel;
 import javax.swing.JTextPane;
+import net.sf.json.JSONObject;
+import org.apache.commons.configuration.Configuration;
+import org.apache.commons.configuration.ConfigurationException;
 import org.apache.log4j.Logger;
 import org.parosproxy.paros.Constant;
+import org.parosproxy.paros.db.DatabaseException;
 import org.parosproxy.paros.extension.AbstractPanel;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
+import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.view.View;
+import org.zaproxy.zap.extension.api.ApiDynamicActionImplementor;
+import org.zaproxy.zap.extension.api.ApiException;
+import org.zaproxy.zap.model.Context;
+import org.zaproxy.zap.session.AbstractSessionManagementMethodOptionsPanel;
+import org.zaproxy.zap.session.SessionManagementMethod;
+import org.zaproxy.zap.session.SessionManagementMethodType;
+import org.zaproxy.zap.session.SessionManagementMethodType.UnsupportedSessionManagementMethodException;
 import org.zaproxy.zap.utils.FontUtils;
+import org.zaproxy.zap.view.LayoutHelper;
 import org.zaproxy.zap.view.ZapMenuItem;
 
 /**
@@ -80,6 +97,118 @@ public class ExtensionSimpleExample extends ExtensionAdaptor {
     public void hook(ExtensionHook extensionHook) {
         super.hook(extensionHook);
 
+        SessionManagementMethodType hack =
+                new SessionManagementMethodType() {
+
+                    HackSessionManagementMethodOptionsPanel panel =
+                            new HackSessionManagementMethodOptionsPanel();
+
+                    @Override
+                    public SessionManagementMethod createSessionManagementMethod(int contextId) {
+                        // TODO Auto-generated method stub
+                        return null;
+                    }
+
+                    @Override
+                    public String getName() {
+                        // TODO Auto-generated method stub
+                        return "TestSessionMgmtMethod";
+                    }
+
+                    @Override
+                    public int getUniqueIdentifier() {
+                        // TODO Auto-generated method stub
+                        return 666;
+                    }
+
+                    @Override
+                    public AbstractSessionManagementMethodOptionsPanel buildOptionsPanel(
+                            Context uiSharedContext) {
+                        // TODO Auto-generated method stub
+                        return panel;
+                    }
+
+                    @Override
+                    public boolean hasOptionsPanel() {
+                        return true;
+                    }
+
+                    @Override
+                    public boolean isTypeForMethod(SessionManagementMethod method) {
+                        // TODO Auto-generated method stub
+                        return false;
+                    }
+
+                    @Override
+                    public void hook(ExtensionHook extensionHook) {
+                        // TODO Auto-generated method stub
+
+                    }
+
+                    @Override
+                    public SessionManagementMethod loadMethodFromSession(
+                            Session session, int contextId) throws DatabaseException {
+                        // TODO Auto-generated method stub
+                        return null;
+                    }
+
+                    @Override
+                    public void persistMethodToSession(
+                            Session session, int contextId, SessionManagementMethod method)
+                            throws DatabaseException {
+                        // TODO Auto-generated method stub
+
+                    }
+
+                    @Override
+                    public void exportData(
+                            Configuration config, SessionManagementMethod sessionMethod) {
+                        // TODO Auto-generated method stub
+
+                    }
+
+                    @Override
+                    public void importData(
+                            Configuration config, SessionManagementMethod sessionMethod)
+                            throws ConfigurationException {
+                        // TODO Auto-generated method stub
+
+                    }
+
+                    @Override
+                    public ApiDynamicActionImplementor getSetMethodForContextApiAction() {
+                        // TODO Auto-generated method stub
+                        ApiDynamicActionImplementor hack2 =
+                                new ApiDynamicActionImplementor(
+                                        "hack test",
+                                        new String[] {"mparam"},
+                                        new String[] {"oparam"}) {
+
+                                    @Override
+                                    public void handleAction(JSONObject params)
+                                            throws ApiException {
+                                        // TODO Auto-generated method stub
+
+                                    }
+                                };
+                        return hack2;
+                    }
+                };
+
+        // extensionHook.addSessionManagementMethodType(hack);
+        try {
+            Method method =
+                    extensionHook
+                            .getClass()
+                            .getMethod(
+                                    "addSessionManagementMethodType",
+                                    SessionManagementMethodType.class);
+            method.invoke(extensionHook, hack);
+        } catch (Exception e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
         this.api = new SimpleExampleAPI(this);
         extensionHook.addApiImplementor(this.api);
 
@@ -88,6 +217,44 @@ public class ExtensionSimpleExample extends ExtensionAdaptor {
             extensionHook.getHookMenu().addToolsMenuItem(getMenuExample());
             extensionHook.getHookMenu().addPopupMenuItem(getPopupMsgMenuExample());
             extensionHook.getHookView().addStatusPanel(getStatusPanel());
+        }
+    }
+
+    private static class HackSessionManagementMethodOptionsPanel
+            extends AbstractSessionManagementMethodOptionsPanel {
+
+        private JCheckBox chk = new JCheckBox();
+
+        public HackSessionManagementMethodOptionsPanel() {
+            this.setLayout(new GridBagLayout());
+            this.add(new JLabel("Configured?"), LayoutHelper.getGBC(0, 0, 1, 0.0d, 0.0d));
+            this.add(chk, LayoutHelper.getGBC(1, 0, 1, 0.0d, 0.0d));
+        }
+
+        public boolean isConf() {
+            return this.chk.isSelected();
+        }
+
+        @Override
+        public void bindMethod(SessionManagementMethod method)
+                throws UnsupportedSessionManagementMethodException {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public void validateFields() throws IllegalStateException {}
+
+        @Override
+        public void saveMethod() {
+            // TODO Auto-generated method stub
+
+        }
+
+        @Override
+        public SessionManagementMethod getMethod() {
+            // TODO Auto-generated method stub
+            return null;
         }
     }
 
