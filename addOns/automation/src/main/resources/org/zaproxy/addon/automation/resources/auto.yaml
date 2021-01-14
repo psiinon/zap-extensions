@@ -1,0 +1,55 @@
+--- # OWASP ZAP automation configuration file, for more details see https://www.zaproxy.com/docs/(TBA)
+env:
+  contexts:
+    - name: bodgeit
+      url: http://localhost:8080/bodgeit/  # The top level url, and the only mandatory parameter in the file, everything under this url will be included
+      includePaths:                        # An optional list of regexes to include
+      excludePaths:                        # An optional list of regexes to exclude
+        - 'http://localhost:8080/bodgeit/logout'
+      authentication:                      # TBA - in time to cover all auth configs
+  parameters:
+    failOnError: true                  
+    failOnWarning: false               
+    progressToStdout: true            
+
+jobs:
+  - type: addOns                       # Any non standard add-ons to install
+    parameters:
+      updateAddOns: false              # Default: true
+    install:
+    uninstall:                         # Any standard add-ons to uninstall
+
+  - type: passiveScan-config           # The passive scanner will always run - this job defines the rules it will use
+    parameters:
+      maxAlertsPerRule: 10             # Int: Maximum number of alerts to raise per rule
+    rules:                             # Can be used to override default settings
+      - id: 2
+        desc: Private IP Disclosure    # Not used - just for documentation
+        threshold: high
+
+  - type: spider                       # The traditional spider - fast but doesnt handle modern apps so well
+    parameters:
+      warnIfFoundUrlsLessThan: 50
+      failIfFoundUrlsLessThan: 20
+      maxDuration: 2                   # The max time in minutes the spider will be allowed to run for, default: 0 unlimited
+      maxDepth: 1
+      parseComments: true              # Bool: 
+
+  - type: passiveScan-wait             # The passive scanner will always run - this job just waits for it to finish
+    parameters:
+      maxDuration: 5                   # The max time to wait for the passive scanner, default: 0 unlimited
+
+  - type: activeScan                   # The active scanner - this actively attacks your app, only run after you have explored your app
+    parameters:                        # TODO check these!
+      maxDurationMinutes: 120          # The max time the active scanner will be allowed to run for, default: 0 unlimited
+      maxRuleDurationMinutes: 20       # The max time each scan rule will be allowed to run for, default: 0 unlimited
+      policy: 'Default policy'
+    rules:                             # Can be used to override default settings, applied after the policy (if supplied)
+      - id: 0
+        desc: Directory Browsing       # Not used - just for documentation
+        strength: high
+      - id: 10003
+        desc: Vulnerable JS Library    # Not used - just for documentation
+        risk: high                     # Will result in an alert filter which will change the risk for all alerts raised by this rule 
+
+  - type: report                       # TBA

@@ -1,0 +1,7 @@
+  - type: spider                       # The traditional spider - fast but doesnt handle modern apps so well
+    parameters:
+      failIfFoundUrlsLessThan:         # Int: Fail if spider finds less than the specified number of URLs, default: 0
+      warnIfFoundUrlsLessThan:         # Int: Warn if spider finds less than the specified number of URLs, default: 0
+      maxDuration:                     # Int: The max time in minutes the spider will be allowed to run for, default: 0 unlimited
+      maxDepth:                        # Int: The maximum tree depth to explore
+      maxChildren:                     # Int: The maximum number of children to add to each node in the tree
