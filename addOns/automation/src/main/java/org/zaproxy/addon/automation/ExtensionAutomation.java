@@ -281,6 +281,14 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     protected Map<String, AutomationJob> getAutomationJobs() {
         return Collections.unmodifiableMap(jobs);
     }
+    
+    public List<JobResultData> getJobResultData() {
+        List<JobResultData> list =  new ArrayList<JobResultData>();
+        for (AutomationJob job : jobs.values()) {
+        	list.addAll(job.getJobResultData());
+        }
+        return list;
+    }
 
     @Override
     public String getDescription() {

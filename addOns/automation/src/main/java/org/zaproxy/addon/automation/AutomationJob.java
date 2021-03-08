@@ -20,11 +20,14 @@
 package org.zaproxy.addon.automation;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
+
 import org.parosproxy.paros.CommandLine;
 import org.parosproxy.paros.Constant;
 
@@ -271,6 +274,10 @@ public abstract class AutomationJob implements Comparable<AutomationJob> {
 
     public Map<String, String> getCustomConfigParameters() {
         return new HashMap<String, String>();
+    }
+
+    public List<JobResultData> getJobResultData() {
+        return new ArrayList<JobResultData>();
     }
 
     public String getExtraConfigFileData() {
