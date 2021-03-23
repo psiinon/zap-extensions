@@ -169,18 +169,17 @@ public class ActiveScanJob extends AutomationJob {
         progress.addJobResultData(getJobResultData(scanId));
     }
 
-    
     public List<JobResultData> getJobResultData() {
-    	ActiveScan lastScan = this.getExtAScan().getLastScan();
-    	if (lastScan != null) {
-    		return getJobResultData(lastScan.getId());
-    	}
-    	return new ArrayList<JobResultData>();
+        ActiveScan lastScan = this.getExtAScan().getLastScan();
+        if (lastScan != null) {
+            return getJobResultData(lastScan.getId());
+        }
+        return new ArrayList<JobResultData>();
     }
 
     private List<JobResultData> getJobResultData(int scanId) {
-        List<JobResultData> list =  new ArrayList<JobResultData>();
-       	list.add(new ActiveScanJobResultData(this.getName(), this.getExtAScan().getScan(scanId)));
+        List<JobResultData> list = new ArrayList<JobResultData>();
+        list.add(new ActiveScanJobResultData(this.getName(), this.getExtAScan().getScan(scanId)));
         return list;
     }
 

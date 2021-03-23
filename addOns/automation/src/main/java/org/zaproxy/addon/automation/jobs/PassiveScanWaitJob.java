@@ -24,7 +24,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
 import org.parosproxy.paros.control.Control;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationJob;
@@ -69,7 +68,7 @@ public class PassiveScanWaitJob extends AutomationJob {
     }
 
     public List<JobResultData> getJobResultData() {
-        List<JobResultData> list =  new ArrayList<JobResultData>();
+        List<JobResultData> list = new ArrayList<JobResultData>();
         ExtensionPassiveScan extPScan =
                 Control.getSingleton()
                         .getExtensionLoader()
@@ -93,7 +92,7 @@ public class PassiveScanWaitJob extends AutomationJob {
         list.add(new PassiveScanJobResultData(this.getName(), extPScan.getPluginPassiveScanners()));
         return list;
     }
-    
+
     @Override
     public boolean applyCustomParameter(String name, String value) {
         switch (name) {

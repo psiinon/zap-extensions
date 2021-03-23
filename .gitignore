@@ -38,3 +38,7 @@
 # --------
 .nb-gradle
 .nb-gradle-properties
+
+# MacOS
+# -----
+.DS_Store

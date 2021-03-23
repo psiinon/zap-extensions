@@ -24,7 +24,6 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import org.parosproxy.paros.CommandLine;
 
 public class AutomationProgress {
@@ -83,23 +82,23 @@ public class AutomationProgress {
     public void setOutputToStdout(boolean outputToStdout) {
         this.outputToStdout = outputToStdout;
     }
-    
+
     // TODO if this is name its harder for reports to get it, but by type could dup :/
     public void addJobResultData(JobResultData data) {
-    	this.jobResultDataMap.put(data.getKey(), data);
+        this.jobResultDataMap.put(data.getKey(), data);
     }
-    
+
     public void addJobResultData(List<JobResultData> list) {
-		for (JobResultData data : list) {
-			this.jobResultDataMap.put(data.getKey(), data);
-    	}
+        for (JobResultData data : list) {
+            this.jobResultDataMap.put(data.getKey(), data);
+        }
     }
-    
+
     public JobResultData getJobResultData(String key) {
-    	return this.jobResultDataMap.get(key);
+        return this.jobResultDataMap.get(key);
     }
-    
+
     public Collection<JobResultData> getAllJobResultData() {
-    	return this.jobResultDataMap.values();
+        return this.jobResultDataMap.values();
     }
 }

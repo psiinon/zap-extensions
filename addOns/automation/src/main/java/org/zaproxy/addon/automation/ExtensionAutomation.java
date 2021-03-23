@@ -208,6 +208,11 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                 }
                 job.applyParameters((LinkedHashMap<?, ?>) paramsObj, progress);
 
+                // In case errors or warnings are encountered in the applyParameters() call above
+                if (env.isTimeToQuit()) {
+                    break;
+                }
+
                 progress.info(
                         Constant.messages.getString("automation.info.jobstart", job.getType()));
                 job.runJob(env, jobData, progress);
@@ -278,14 +283,14 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         return "";
     }
 
-    protected Map<String, AutomationJob> getAutomationJobs() {
+    public Map<String, AutomationJob> getAutomationJobs() {
         return Collections.unmodifiableMap(jobs);
     }
-    
+
     public List<JobResultData> getJobResultData() {
-        List<JobResultData> list =  new ArrayList<JobResultData>();
+        List<JobResultData> list = new ArrayList<JobResultData>();
         for (AutomationJob job : jobs.values()) {
-        	list.addAll(job.getJobResultData());
+            list.addAll(job.getJobResultData());
         }
         return list;
     }
