@@ -19,6 +19,7 @@
  */
 package org.zaproxy.addon.automation;
 
+import java.util.LinkedHashMap;
 import org.apache.commons.lang3.EnumUtils;
 import org.parosproxy.paros.Constant;
 
@@ -31,17 +32,31 @@ public abstract class AbstractAutomationTest {
     }
 
     private final OnFail onFail;
+    private final String jobType;
 
-    public AbstractAutomationTest(String name, String onFail) {
+    public AbstractAutomationTest(LinkedHashMap<?, ?> testData, String jobType) {
+        String onFailStr = AutomationJob.safeCast(testData.get("onFail"), String.class);
+
+        if (!EnumUtils.isValidEnumIgnoreCase(OnFail.class, onFailStr)) {
+            throw new IllegalArgumentException(
+                    Constant.messages.getString(
+                            "automation.tests.invalidOnFail", getJobType(), onFailStr));
+        }
+        this.onFail = EnumUtils.getEnumIgnoreCase(OnFail.class, onFailStr);
+        this.jobType = jobType;
+    }
+
+    public AbstractAutomationTest(String name, String onFail, String jobType) {
         if (!EnumUtils.isValidEnumIgnoreCase(OnFail.class, onFail)) {
             throw new IllegalArgumentException(
                     Constant.messages.getString("automation.tests.invalidOnFail", name, onFail));
         }
         this.onFail = EnumUtils.getEnumIgnoreCase(OnFail.class, onFail);
+        this.jobType = jobType;
     }
 
     public void logToProgress(AutomationProgress progress) throws RuntimeException {
-        if (hasPassed()) {
+        if (runTest()) {
             progress.info(getTestPassedMessage());
             return;
         }
@@ -60,9 +75,21 @@ public abstract class AbstractAutomationTest {
         }
     }
 
+    public abstract String getName();
+
+    public final String getJobType() {
+        return this.jobType;
+    }
+
+    public abstract String getTestType();
+
+    public abstract boolean runTest();
+
     public abstract boolean hasPassed();
 
-    protected abstract String getTestPassedMessage();
+    public abstract boolean hasRun();
 
-    protected abstract String getTestFailedMessage();
+    public abstract String getTestPassedMessage();
+
+    public abstract String getTestFailedMessage();
 }

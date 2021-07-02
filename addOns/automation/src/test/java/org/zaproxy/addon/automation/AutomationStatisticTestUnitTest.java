@@ -76,17 +76,24 @@ class AutomationStatisticTestUnitTest extends TestUtils {
         String name = "example name";
         String key = "stats.job.something";
         String onFail = "warn";
+        String type = "job1";
         AutomationStatisticTest test =
-                new AutomationStatisticTest(key, name, operator, value, onFail, null);
+                new AutomationStatisticTest(key, name, operator, value, onFail, type);
 
         // When
+        boolean hasRunFirst = test.hasRun();
         when(extStats.getInMemoryStats().getStat(key)).thenReturn(statValue);
         test.logToProgress(progress);
 
         // Then
+        assertThat(hasRunFirst, is(false));
+        assertThat(test.getName(), is(name));
+        assertThat(test.getTestType(), is(AutomationStatisticTest.TEST_TYPE));
+        assertThat(test.getJobType(), is(type));
         assertThat(progress.hasWarnings(), is(false));
         assertThat(progress.hasErrors(), is(false));
         assertThat(progress.getInfos().get(0), is("!automation.tests.stats.pass!"));
+        assertThat(test.hasRun(), is(true));
         assertThat(test.hasPassed(), is(true));
     }
 
@@ -121,6 +128,7 @@ class AutomationStatisticTestUnitTest extends TestUtils {
         assertThat(progress.hasWarnings(), is(true));
         assertThat(progress.getWarnings().size(), is(1));
         assertThat(progress.getWarnings().get(0), is("!automation.tests.stats.fail!"));
+        assertThat(test.hasRun(), is(true));
         assertThat(test.hasPassed(), is(false));
     }
 
