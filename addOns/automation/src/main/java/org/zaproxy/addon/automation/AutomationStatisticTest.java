@@ -37,7 +37,6 @@ public class AutomationStatisticTest extends AbstractAutomationTest {
     public final String onFail;
     public final String jobType;
     private long stat;
-    private Boolean passed;
 
     enum Operator {
         LESS("<"),
@@ -126,37 +125,20 @@ public class AutomationStatisticTest extends AbstractAutomationTest {
                         : 0;
         switch (operator) {
             case LESS:
-                passed = stat < value;
-                break;
+                return stat < value;
             case GREATER:
-                passed = stat > value;
-                break;
+                return stat > value;
             case LESS_OR_EQUAL:
-                passed = stat <= value;
-                break;
+                return stat <= value;
             case GREATER_OR_EQUAL:
-                passed = stat >= value;
-                break;
+                return stat >= value;
             case EQUAL:
-                passed = stat == value;
-                break;
+                return stat == value;
             case NOT_EQUAL:
-                passed = stat != value;
-                break;
+                return stat != value;
             default:
                 throw new RuntimeException("Unexpected operator " + operator);
         }
-        return passed;
-    }
-
-    @Override
-    public boolean hasPassed() {
-        return this.passed == null ? false : this.passed;
-    }
-
-    @Override
-    public boolean hasRun() {
-        return this.passed != null;
     }
 
     @Override

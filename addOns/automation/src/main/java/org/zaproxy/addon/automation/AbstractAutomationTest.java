@@ -31,10 +31,13 @@ public abstract class AbstractAutomationTest {
         INFO
     }
 
+    private LinkedHashMap<?, ?> testData;
     private final OnFail onFail;
     private final String jobType;
+    private Boolean passed;
 
     public AbstractAutomationTest(LinkedHashMap<?, ?> testData, String jobType) {
+        this.testData = testData;
         String onFailStr = AutomationJob.safeCast(testData.get("onFail"), String.class);
 
         if (!EnumUtils.isValidEnumIgnoreCase(OnFail.class, onFailStr)) {
@@ -56,7 +59,8 @@ public abstract class AbstractAutomationTest {
     }
 
     public void logToProgress(AutomationProgress progress) throws RuntimeException {
-        if (runTest()) {
+        this.passed = runTest();
+        if (passed) {
             progress.info(getTestPassedMessage());
             return;
         }
@@ -75,19 +79,31 @@ public abstract class AbstractAutomationTest {
         }
     }
 
-    public abstract String getName();
-
     public final String getJobType() {
         return this.jobType;
     }
 
+    public boolean hasPassed() {
+        return this.passed == null ? false : this.passed;
+    }
+
+    public boolean hasRun() {
+        return this.passed != null;
+    }
+
+    public void reset() {
+        this.passed = null;
+    }
+
+    public LinkedHashMap<?, ?> getTestData() {
+        return testData;
+    }
+
+    public abstract String getName();
+
     public abstract String getTestType();
 
     public abstract boolean runTest();
-
-    public abstract boolean hasPassed();
-
-    public abstract boolean hasRun();
 
     public abstract String getTestPassedMessage();
 

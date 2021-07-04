@@ -46,7 +46,9 @@ import org.parosproxy.paros.extension.CommandLineListener;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
 import org.parosproxy.paros.model.Model;
+import org.parosproxy.paros.view.View;
 import org.yaml.snakeyaml.Yaml;
+import org.zaproxy.addon.automation.gui.AutomationPanel;
 import org.zaproxy.addon.automation.jobs.ActiveScanJob;
 import org.zaproxy.addon.automation.jobs.AddOnJob;
 import org.zaproxy.addon.automation.jobs.ParamsJob;
@@ -73,13 +75,17 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     private Map<String, AutomationJob> jobs = new HashMap<>();
     private SortedSet<AutomationJob> sortedJobs = new TreeSet<>();
 
-    private List<AutomationPlan> plans = new ArrayList<>();
+    private LinkedHashMap<Integer, AutomationPlan> plans = new LinkedHashMap<>();
+
+    private AutomationParam param;
 
     private CommandLineArgument[] arguments = new CommandLineArgument[4];
     private static final int ARG_AUTO_RUN_IDX = 0;
     private static final int ARG_AUTO_GEN_MIN_IDX = 1;
     private static final int ARG_AUTO_GEN_MAX_IDX = 2;
     private static final int ARG_AUTO_GEN_CONF_IDX = 3;
+
+    private AutomationPanel automationPanel;
 
     public ExtensionAutomation() {
         super(NAME);
@@ -99,7 +105,16 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         super.hook(extensionHook);
 
         extensionHook.addCommandLine(getCommandLineArguments());
+        extensionHook.addOptionsParamSet(getParam());
+
+        if (getView() != null) {
+            // TODO wait until options loaded? Not sure we can :/
+            extensionHook.getHookView().addStatusPanel(getAutomationPanel());
+        }
     }
+
+    @Override
+    public void optionsLoaded() {}
 
     @Override
     public boolean canUnload() {
@@ -111,6 +126,13 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     @Override
     public void unload() {
         super.unload();
+    }
+
+    private AutomationPanel getAutomationPanel() {
+        if (automationPanel == null) {
+            automationPanel = new AutomationPanel(this);
+        }
+        return automationPanel;
     }
 
     public void registerAutomationJob(AutomationJob job) {
@@ -183,30 +205,47 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
 
     public AutomationProgress runPlan(AutomationPlan plan, boolean resetProgress)
             throws AutomationJobException {
-        AutomationProgress progress = plan.getProgress();
         if (resetProgress) {
-            progress = plan.resetProgress();
+            plan.resetProgress();
         }
+        AutomationProgress progress = plan.getProgress();
         AutomationEnvironment env = plan.getEnv();
 
+        AutomationEventPublisher.publishEvent(AutomationEventPublisher.PLAN_STARTED, plan, null);
+        env.create(Model.getSingleton().getSession(), progress);
+
         if (env.isTimeToQuit()) {
+            AutomationEventPublisher.publishEvent(
+                    AutomationEventPublisher.PLAN_FINISHED, plan, plan.getProgress().toMap());
             return progress;
         }
+        AutomationEventPublisher.publishEvent(
+                AutomationEventPublisher.PLAN_ENV_CREATED, plan, null);
 
         List<AutomationJob> jobsToRun = plan.getJobs();
 
         for (AutomationJob job : jobsToRun) {
             job.applyParameters(progress);
             progress.info(Constant.messages.getString("automation.info.jobstart", job.getType()));
+            job.setStatus(AutomationJob.Status.RUNNING);
+            AutomationEventPublisher.publishEvent(AutomationEventPublisher.JOB_STARTED, job, null);
+            // updateGui(job);
             job.runJob(env, progress);
             job.logTestsToProgress(progress);
+            job.setStatus(AutomationJob.Status.COMPLETED);
+            AutomationEventPublisher.publishEvent(
+                    AutomationEventPublisher.JOB_FINISHED,
+                    job,
+                    job.getPlan().getProgress().getJobResults(job).toMap());
+            progress.info(Constant.messages.getString("automation.info.jobend", job.getType()));
             progress.addRunJob(job);
             if (env.isTimeToQuit()) {
                 break;
             }
-            progress.info(Constant.messages.getString("automation.info.jobend", job.getType()));
         }
 
+        AutomationEventPublisher.publishEvent(
+                AutomationEventPublisher.PLAN_FINISHED, plan, plan.getProgress().toMap());
         return progress;
     }
 
@@ -224,11 +263,9 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         ArrayList<?> jobsData = (ArrayList<?>) data.get("jobs");
 
         AutomationProgress progress = new AutomationProgress();
-        AutomationEnvironment env =
-                new AutomationEnvironment(envData, progress, Model.getSingleton().getSession());
+        AutomationEnvironment env = new AutomationEnvironment(envData, progress);
 
-        // Map<AutomationJob, LinkedHashMap<?, ?>> jobsToRun = new LinkedHashMap<>();
-        List<AutomationJob> jobsToRun2 = new ArrayList<>();
+        List<AutomationJob> jobsToRun = new ArrayList<>();
 
         for (Object jobObj : jobsData) {
             if (!(jobObj instanceof LinkedHashMap<?, ?>)) {
@@ -265,8 +302,7 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                 job.setJobData(jobData);
                 job.verifyParameters(progress);
                 job.verifyJobSpecificData(progress);
-                // jobsToRun.put(job, jobData);
-                jobsToRun2.add(job);
+                jobsToRun.add(job);
 
                 job.addTests(jobData.get("tests"), progress);
             } else {
@@ -275,11 +311,15 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
             }
         }
 
-        return new AutomationPlan(env, jobsToRun2, progress);
+        return new AutomationPlan(env, jobsToRun, progress);
     }
 
     public void registerPlan(AutomationPlan plan) {
-        this.plans.add(plan);
+        this.plans.put(plan.getId(), plan);
+    }
+
+    public AutomationPlan getPlan(int planId) {
+        return this.plans.get(planId);
     }
 
     /**
@@ -298,6 +338,11 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         }
         try (FileInputStream is = new FileInputStream(f)) {
             AutomationPlan plan = this.loadPlan(is);
+            if (View.isInitialised()) {
+                this.getAutomationPanel().setCurrentPlan(plan);
+                // TODO temp disable while testing ;)
+                return plan.getProgress();
+            }
             this.runPlan(plan, false);
             AutomationProgress progress = plan.getProgress();
 
@@ -351,6 +396,13 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
             list.addAll(job.getJobResultData());
         }
         return list;
+    }
+
+    public AutomationParam getParam() {
+        if (param == null) {
+            param = new AutomationParam();
+        }
+        return param;
     }
 
     @Override
