@@ -64,9 +64,6 @@ public class RequestorJob extends AutomationJob {
     @Override
     public void verifyJobSpecificData(AutomationProgress progress) {
         LinkedHashMap<?, ?> jobData = this.getJobData();
-        if (jobData == null) {
-            return;
-        }
         Object o = jobData.get(REQUESTS);
         if (o == null) {
             return;
@@ -145,9 +142,6 @@ public class RequestorJob extends AutomationJob {
     @Override
     public void runJob(AutomationEnvironment env, AutomationProgress progress) {
         LinkedHashMap<?, ?> jobData = this.getJobData();
-        if (jobData == null) {
-            return;
-        }
         ArrayList<?> requests = (ArrayList<?>) jobData.get(REQUESTS);
         if (requests != null) {
             for (Object request : requests) {

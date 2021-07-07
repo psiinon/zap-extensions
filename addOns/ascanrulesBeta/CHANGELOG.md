@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 
+## [35] - 2021-07-06
+### Fixed
+- Correct dependency requirements.
+
 ## [34] - 2021-06-17
 ### Changed
 - Now using 2.10 logging infrastructure (Log4j 2.x).
@@ -302,6 +306,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Updated to support new addon format
 
+[35]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v35
 [34]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v34
 [33]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v33
 [32]: https://github.com/zaproxy/zap-extensions/releases/ascanrulesBeta-v32

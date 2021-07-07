@@ -75,9 +75,8 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     private Map<String, AutomationJob> jobs = new HashMap<>();
     private SortedSet<AutomationJob> sortedJobs = new TreeSet<>();
 
-    private LinkedHashMap<Integer, AutomationPlan> plans = new LinkedHashMap<>();
-
     private AutomationParam param;
+    private LinkedHashMap<Integer, AutomationPlan> plans = new LinkedHashMap<>();
 
     private CommandLineArgument[] arguments = new CommandLineArgument[4];
     private static final int ARG_AUTO_RUN_IDX = 0;

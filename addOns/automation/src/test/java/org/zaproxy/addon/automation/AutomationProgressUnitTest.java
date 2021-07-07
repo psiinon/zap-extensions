@@ -23,10 +23,8 @@ import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.Mockito.mock;
 
-import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.provider.Arguments;
 import org.zaproxy.addon.automation.AutomationProgress.JobResults;
 import org.zaproxy.zap.testutils.TestUtils;
 
@@ -37,18 +35,6 @@ class AutomationProgressUnitTest extends TestUtils {
     @BeforeEach
     void setUp() {
         progress = new AutomationProgress();
-    }
-
-    static Stream<Arguments> shouldPassTestParamsSource() {
-        return Stream.of(
-                Arguments.of("<", 1, 2),
-                Arguments.of(">", 4, 3),
-                Arguments.of("<=", 5, 5),
-                Arguments.of("<=", 5, 6),
-                Arguments.of(">=", 7, 7),
-                Arguments.of(">=", 8, 7),
-                Arguments.of("==", 9, 9),
-                Arguments.of("!=", 10, 11));
     }
 
     @Test
