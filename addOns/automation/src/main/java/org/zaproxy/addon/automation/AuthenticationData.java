@@ -42,7 +42,7 @@ public class AuthenticationData extends AutomationData {
 
     public static final String VERIFICATION_ELEMENT = "verification";
 
-    private static List<String> validMethods = Arrays.asList(METHOD_MANUAL, METHOD_HTTP);
+    public static List<String> validMethods = Arrays.asList(METHOD_MANUAL, METHOD_HTTP);
 
     private String method;
     private String script;

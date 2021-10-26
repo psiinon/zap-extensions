@@ -445,6 +445,17 @@ public class JobUtils {
         return i;
     }
 
+    public static int unBox(Object i, int defaultInt) {
+        if (i != null) {
+            try {
+                return Integer.parseInt(i.toString());
+            } catch (NumberFormatException e) {
+                // Ignore
+            }
+        }
+        return defaultInt;
+    }
+
     public static long unBox(Long i) {
         if (i == null) {
             return 0;
@@ -464,6 +475,13 @@ public class JobUtils {
             return defaultStr;
         }
         return s;
+    }
+
+    public static String unBox(Object s, String defaultStr) {
+        if (s == null) {
+            return defaultStr;
+        }
+        return s.toString();
     }
 
     public static void addPrivateField(Map<String, Object> list, String fieldName, Object obj) {
