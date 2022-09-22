@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
 import java.io.IOException;
 import java.net.SocketException;
@@ -34,13 +34,13 @@ import org.parosproxy.paros.core.scanner.Category;
 import org.parosproxy.paros.core.scanner.Plugin;
 import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.addon.commonlib.SourceSinkUtils;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.DjangoTemplateFormat;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.GoTemplateFormat;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.InputPoint;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.ReflectedSinkPoint;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.SinkPoint;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.StoredSinkPoint;
-import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.TemplateFormat;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.DjangoTemplateFormat;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.GoTemplateFormat;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.InputPoint;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.ReflectedSinkPoint;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.SinkPoint;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.StoredSinkPoint;
+import org.zaproxy.zap.extension.ascanrulesBeta.ssti.TemplateFormat;
 
 /**
  * Active Plugin for Server Side Template Injection testing and verification.
@@ -50,7 +50,7 @@ import org.zaproxy.zap.extension.ascanrulesAlpha.ssti.TemplateFormat;
 public class SstiScanRule extends AbstractAppParamPlugin {
 
     /** Prefix for internationalised messages used by this rule */
-    private static final String MESSAGE_PREFIX = "ascanalpha.ssti.";
+    private static final String MESSAGE_PREFIX = "ascanbeta.ssti.";
 
     static final String DELIMITER = "zj";
 

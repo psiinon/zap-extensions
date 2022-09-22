@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -140,7 +140,7 @@ public class CorsScanRule extends AbstractAppPlugin {
     }
 
     private static String getConstantStr(String suffix) {
-        return Constant.messages.getString("ascanalpha.cors." + suffix);
+        return Constant.messages.getString("ascanbeta.cors." + suffix);
     }
 
     @Override

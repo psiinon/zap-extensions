@@ -4,7 +4,17 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
-
+### Removed
+- The following scan rules were removed, having been promoted to Beta:
+    - CORS
+    - Exponential Entity Expansion
+    - Forbidden Bypass
+    - Log4 Shell
+    - Out-of-Band XSS
+    - Spring 4 Shell
+    - Spring Actuator
+    - Blind SSTI
+    - SSTI
 
 ## [39] - 2022-09-22
 ### Changed

@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -40,7 +40,7 @@ import org.zaproxy.zap.model.TechSet;
 public class Log4ShellScanRule extends AbstractAppParamPlugin {
 
     private static final Logger LOGGER = LogManager.getLogger(Log4ShellScanRule.class);
-    private static final String PREFIX = "ascanalpha.log4shell.";
+    private static final String PREFIX = "ascanbeta.log4shell.";
     private static final String PREFIX_CVE44228 = PREFIX + "cve44228.";
     private static final String PREFIX_CVE45046 = PREFIX + "cve45046.";
     private static final String[] ATTACK_PATTERNS_CVE44228 = {

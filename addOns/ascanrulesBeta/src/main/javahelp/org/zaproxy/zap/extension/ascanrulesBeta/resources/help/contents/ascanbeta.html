@@ -26,6 +26,11 @@ Tests cookies to detect if some have no effect on response size when omitted, es
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/SlackerCookieDetector.java">SlackerCookieDetector.java</a>
 
+<H2>CORS Header</H2>
+This rule attempts to identify CORS headers and also CORS misconfiguration. The CORS is considered as misconfigured when it allows all origins, origins with weaker protocols and null origin.<br>
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/CorsScanRule.java">CorsScanRule.java</a>
+
 <H2>Cross-Domain Misconfiguration</H2>
 Checks if the web server is configured to allow Cross Domain access, from a malicious
 third party service, for instance. Currently checks for wildcards in Adobe's crossdomain.xml, and in
@@ -54,6 +59,11 @@ with no content-type. This rule also check for content length over 500 character
 larger, possibly intentional, files.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/EnvFileScanRule.java">EnvFileScanRule.java</a>
+
+<H2>Exponential Entity Expansion (Billion Laughs Attack)</H2>
+This rule attempts to identify the "Billion Laughs" vulnerability in servers that accept XML or YAML files.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/ExponentialEntityExpansionScanRule.java">ExponentialEntityExpansionScanRule.java</a>
 
 <H2>Expression Language Injection</H2>
 Checks if the web application is subject to Expression Language (EL) injection attacks, which occur
@@ -159,6 +169,23 @@ this by putting out multiple strings of integers designed to try and stimulate b
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/IntegerOverflowScanRule.java">IntegerOverflowScanRule.java</a>
 
+<H2>Java Spring Actuators</H2>
+This rule attempts to identify if the Spring Actuators are enabled. Tests for the default /actuator/health route in the application.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/SpringActuatorScanRule.java">SpringActuatorScanRule.java</a>
+
+<H2>Log4Shell (CVE-2021-44228 and CVE-2021-45046)</H2>
+This rule attempts to discover the Log4Shell (<a href="https://www.cve.org/CVERecord?id=CVE-2021-44228">CVE-2021-44228</a> and <a href="https://www.cve.org/CVERecord?id=CVE-2021-45046">CVE-2021-45046</a>) vulnerabilities.
+It relies on the OAST add-on to generate out-of-band payloads and verify DNS interactions.
+We recommend that this scan rule is used with header injection enabled for maximum coverage.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/Log4ShellScanRule.java">Log4ShellScanRule.java</a>
+
+<H2>Out of Band XSS</H2>
+This rule attempts to discover Out-of-band XSS vulnerabilities.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/OutOfBandXssScanRule.java">OutOfBandXssScanRule.java</a>
+
 <H2>Padding Oracle</H2>
 This rule attempts to manipulate the padding of encrypted strings to trigger an error response 
 indicating a likely padding oracle vulnerability. 
@@ -188,6 +215,16 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 Detect CVE-2012-1823 to perform Remote Code Execution on a PHP-CGI based web server.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/RemoteCodeExecutionCve20121823ScanRule.java">RemoteCodeExecutionCve20121823ScanRule.java</a>
+
+<H2>Server Side Template Injection</H2>
+This rule attempts to detect situations in which user input might be interpreted as part of the template and processed on the server, versus the user input simply being used as an argument to the template/engine.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/SstiScanRule.java">SstiScanRule.java</a>
+
+<H2>Server Side Template Injection (Blind)</H2>
+This rule goes one step further than the SSTI scan rule and attempts to find places where the impact of the user input is not immediately obvious, such as when used by an admin panel, report output, invoice, etc.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/SstiBlindScanRule.java">SstiBlindScanRule.java</a>
 
 <H2>Session Fixation</H2>
 Session Fixation may be possible. If this issue occurs with a login URL (where the user authenticates themselves to the application), then the URL may be given by an attacker, along with a fixed session id, to a victim, in order to later assume the identity of the victim using the given session id. If the issue occurs with a non-login page, the URL and fixed session id may only be used by an attacker to track an unauthenticated user's actions. If the vulnerability occurs on a cookie field or a form field (POST parameter) rather than on a URL (GET) parameter, then some other vulnerability may also be required in order to set the cookie field on the victim's browser, to allow the vulnerability to be exploited.
@@ -225,6 +262,13 @@ Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns
 Uses Git source code repository metadata to scan for files containing source code on the web server.
 <p>
 Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/SourceCodeDisclosureGitScanRule.java">SourceCodeDisclosureGitScanRule.java</a>
+
+<H2>Spring4Shell (CVE-2022-22965)</H2>
+This rule attempts to discover the Spring4Shell (<a href="https://tanzu.vmware.com/security/cve-2022-22965">CVE-2022-22965</a> vulnerability.
+It uses a payload of <code>class.module.classLoader.DefaultAssertionStatus=nonsense</code> on all nodes and raises an alert if this payload results in a 400 response.
+It will not raise an alert if a similar but safe payload also results in a 400 response.
+<p>
+Latest code: <a href="https://github.com/zaproxy/zap-extensions/blob/main/addOns/ascanrulesBeta/src/main/java/org/zaproxy/zap/extension/ascanrulesBeta/Spring4ShellScanRule.java">Spring4ShellScanRule.java</a>
 
 <H2>SQL Injection - Hypersonic (Time Based)</H2>
 

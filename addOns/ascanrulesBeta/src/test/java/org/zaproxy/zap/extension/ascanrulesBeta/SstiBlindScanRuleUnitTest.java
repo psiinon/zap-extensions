@@ -17,22 +17,28 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha.ssti;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
-/**
- * This represents the code that is necessary to execute an arithmetic operation in Django template
- * engine and the expected result of the operation.
- *
- * @author DiogoMRSilva (2018)
- */
-public class DjangoTemplateFormat extends TemplateFormat {
+import org.parosproxy.paros.core.scanner.Plugin;
 
-    public DjangoTemplateFormat() {
-        super("{{", "}}", "{{%d0|add:%d0}}");
+class SstiBlindScanRuleUnitTest extends ActiveScannerTest<SstiBlindScanRule> {
+
+    @Override
+    protected SstiBlindScanRule createScanner() {
+        return new SstiBlindScanRule();
     }
 
     @Override
-    public int getExpectedResult(int number1, int number2) {
-        return number1 * 10 + number2 * 10;
+    protected int getRecommendMaxNumberMessagesPerParam(Plugin.AttackStrength strength) {
+        int recommendMax = super.getRecommendMaxNumberMessagesPerParam(strength);
+        switch (strength) {
+            case LOW:
+                return recommendMax + 6;
+            case MEDIUM:
+            case HIGH:
+            case INSANE:
+            default:
+                return recommendMax;
+        }
     }
 }
