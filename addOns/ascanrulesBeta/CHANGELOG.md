@@ -8,15 +8,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Depend on `database` add-on.
 - Maintenance changes.
 
+### Added
+- New User Agent strings to the User Agent fuzz scan rule.
+- Additional source control paths for the Hidden Files finder scan rule.
+- The following scan rules were added, having been promoted to Beta:
+    - CORS
+    - Exponential Entity Expansion
+    - Forbidden Bypass
+    - Log4 Shell
+    - Out-of-Band XSS
+    - Spring 4 Shell
+    - Spring Actuator
+    - Blind SSTI
+    - SSTI
+
 ## [42] - 2022-09-22
 ### Changed
 - Maintenance changes.
 - Improved description, solution, and references for the Integer Overflow scan rule.
 - Added new Custom Payloads alert tag to the example alerts of the Hidden File Finder and User Agent scan rules.
-
-### Added
-- New User Agent strings to the User Agent fuzz scan rule.
-- Additional source control paths for the Hidden Files finder scan rule.
 
 ## [41] - 2022-06-08
 ### Changed

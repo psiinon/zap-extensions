@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
 import java.io.IOException;
 import java.text.MessageFormat;
@@ -63,7 +63,7 @@ public class OutOfBandXssScanRule extends AbstractAppParamPlugin {
 
     @Override
     public String getName() {
-        return Constant.messages.getString("ascanalpha.oobxss.name");
+        return Constant.messages.getString("ascanbeta.oobxss.name");
     }
 
     @Override
@@ -138,7 +138,7 @@ public class OutOfBandXssScanRule extends AbstractAppParamPlugin {
                 || (extOast.getCallbackService() == null
                         && extOast.getActiveScanOastService() == null)) {
             getParent()
-                    .pluginSkipped(this, Constant.messages.getString("ascanalpha.oobxss.skipped"));
+                    .pluginSkipped(this, Constant.messages.getString("ascanbeta.oobxss.skipped"));
         }
     }
 

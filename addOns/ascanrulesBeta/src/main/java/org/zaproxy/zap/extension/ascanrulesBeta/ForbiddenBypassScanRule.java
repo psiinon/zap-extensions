@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -41,7 +41,7 @@ import org.zaproxy.addon.commonlib.CommonAlertTag;
  */
 public class ForbiddenBypassScanRule extends AbstractAppPlugin {
 
-    private static final String MESSAGE_PREFIX = "ascanalpha.forbiddenBypass.";
+    private static final String MESSAGE_PREFIX = "ascanbeta.forbiddenBypass.";
     private static final Logger LOG = LogManager.getLogger(ForbiddenBypassScanRule.class);
     private static final Map<String, String> ALERT_TAGS =
             CommonAlertTag.toMap(

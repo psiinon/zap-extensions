@@ -17,7 +17,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta;
 
 import java.io.IOException;
 import java.net.SocketException;
@@ -42,7 +42,7 @@ import org.zaproxy.zap.model.Tech;
 public class SstiBlindScanRule extends AbstractAppParamPlugin {
 
     /** Prefix for internationalised messages used by this rule */
-    private static final String MESSAGE_PREFIX = "ascanalpha.sstiblind.";
+    private static final String MESSAGE_PREFIX = "ascanbeta.sstiblind.";
 
     private static final String SECONDS_PLACEHOLDER = "X_SECONDS_X";
 

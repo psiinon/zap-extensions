@@ -17,28 +17,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.zaproxy.zap.extension.ascanrulesAlpha;
+package org.zaproxy.zap.extension.ascanrulesBeta.ssti;
 
-import org.parosproxy.paros.core.scanner.Plugin;
+/**
+ * This represents the code that is necessary to execute an arithmetic operation in Golang template
+ * engine and the expected result of the operation.
+ *
+ * @author DiogoMRSilva (2018)
+ */
+public class GoTemplateFormat extends TemplateFormat {
 
-class SstiBlindScanRuleUnitTest extends ActiveScannerTest<SstiBlindScanRule> {
-
-    @Override
-    protected SstiBlindScanRule createScanner() {
-        return new SstiBlindScanRule();
+    public GoTemplateFormat() {
+        super("{", "}", "{{print \"%d\" \"%d\"}}");
     }
 
     @Override
-    protected int getRecommendMaxNumberMessagesPerParam(Plugin.AttackStrength strength) {
-        int recommendMax = super.getRecommendMaxNumberMessagesPerParam(strength);
-        switch (strength) {
-            case LOW:
-                return recommendMax + 6;
-            case MEDIUM:
-            case HIGH:
-            case INSANE:
-            default:
-                return recommendMax;
-        }
+    public int getExpectedResult(int number1, int number2) {
+        String concatenated = String.format("%d%d", number1, number2);
+        return Integer.parseInt(concatenated);
     }
 }
