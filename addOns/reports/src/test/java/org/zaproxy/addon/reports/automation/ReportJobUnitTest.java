@@ -44,10 +44,13 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
 import org.mockito.quality.Strictness;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
@@ -60,6 +63,7 @@ import org.zaproxy.addon.automation.AutomationPlan;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ContextWrapper;
 import org.zaproxy.addon.reports.ExtensionReports;
+import org.zaproxy.addon.reports.ReportData;
 import org.zaproxy.addon.reports.ReportParam;
 import org.zaproxy.addon.reports.Template;
 import org.zaproxy.zap.testutils.TestUtils;
@@ -67,310 +71,369 @@ import org.zaproxy.zap.testutils.TestUtils;
 /** Unit test for {@link ReportJob}. */
 class ReportJobUnitTest extends TestUtils {
 
-    private ExtensionReports extensionReports;
+	private ExtensionReports extensionReports;
 
-    @BeforeEach
-    void setUp() {
-        ExtensionLoader extensionLoader =
-                mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
-        extensionReports =
-                mock(ExtensionReports.class, withSettings().strictness(Strictness.LENIENT));
-        given(extensionReports.getReportParam()).willReturn(new ReportParam());
-        given(extensionLoader.getExtension(ExtensionReports.class)).willReturn(extensionReports);
-        Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
+	@BeforeEach
+	void setUp() {
+		ExtensionLoader extensionLoader = mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+		extensionReports = mock(ExtensionReports.class, withSettings().strictness(Strictness.LENIENT));
+		given(extensionReports.getReportParam()).willReturn(new ReportParam());
+		given(extensionLoader.getExtension(ExtensionReports.class)).willReturn(extensionReports);
+		Control.initSingletonForTesting(Model.getSingleton(), extensionLoader);
 
-        mockMessages(new ExtensionReports());
-    }
+		mockMessages(new ExtensionReports());
+	}
 
-    @AfterEach
-    void cleanUp() {
-        Constant.messages = null;
-    }
+	@AfterEach
+	void cleanUp() {
+		Constant.messages = null;
+	}
 
-    @Test
-    void shouldReturnDefaultFields() {
-        // Given / When
-        ReportJob job = new ReportJob();
+	@Test
+	void shouldReturnDefaultFields() {
+		// Given / When
+		ReportJob job = new ReportJob();
 
-        // Then
-        assertThat(job.getType(), is(equalTo("report")));
-        assertThat(job.getName(), is(equalTo("report")));
-        assertThat(job.getOrder(), is(equalTo(AutomationJob.Order.REPORT)));
-        assertThat(job.getData().getRisks(), is(nullValue()));
-        assertThat(job.getData().getConfidences(), is(nullValue()));
-        assertThat(job.getData().getSections(), is(nullValue()));
-        assertThat(job.getParamMethodObject(), is(nullValue()));
-        assertThat(job.getParamMethodName(), is(nullValue()));
-    }
+		// Then
+		assertThat(job.getType(), is(equalTo("report")));
+		assertThat(job.getName(), is(equalTo("report")));
+		assertThat(job.getOrder(), is(equalTo(AutomationJob.Order.REPORT)));
+		assertThat(job.getData().getRisks(), is(nullValue()));
+		assertThat(job.getData().getConfidences(), is(nullValue()));
+		assertThat(job.getData().getSections(), is(nullValue()));
+		assertThat(job.getData().getSites(), is(nullValue()));
+		assertThat(job.getParamMethodObject(), is(nullValue()));
+		assertThat(job.getParamMethodName(), is(nullValue()));
+	}
 
-    @Test
-    void shouldApplyCustomData() {
-        // Given
-        ReportJob job =
-                createReportJob(
-                        "risks:\n"
-                                + "- low\n"
-                                + "- high\n"
-                                + "confidences:\n"
-                                + "- medium\n"
-                                + "- confirmed\n"
-                                + "sections:\n"
-                                + "- siteRiskCounts\n"
-                                + "- summaries");
-        AutomationProgress progress = new AutomationProgress();
+	@Test
+	void shouldApplyCustomData() {
+		// Given
+		ReportJob job = createReportJob(
+				"risks:\n" + "- low\n" + "- high\n" + "confidences:\n" + "- medium\n" + "- confirmed\n" + "sections:\n"
+						+ "- siteRiskCounts\n" + "- summaries\n" + "sites:\n" + "- example.com\n" + "- test.com");
 
-        // When
-        job.verifyParameters(progress);
+		AutomationProgress progress = new AutomationProgress();
 
-        // Then
-        assertThat(job.getData().getRisks(), contains("low", "high"));
-        assertThat(job.getData().getConfidences(), contains("medium", "confirmed"));
-        assertThat(job.getData().getSections(), contains("siteRiskCounts", "summaries"));
-    }
+		// When
+		job.verifyParameters(progress);
 
-    @Test
-    void shouldReturnCustomConfigParams() {
-        // Given
-        ReportJob job = new ReportJob();
+		// Then
+		assertThat(job.getData().getRisks(), contains("low", "high"));
+		assertThat(job.getData().getConfidences(), contains("medium", "confirmed"));
+		assertThat(job.getData().getSections(), contains("siteRiskCounts", "summaries"));
+		assertThat(job.getData().getSites(), contains("example.com", "test.com"));
+	}
 
-        // When
-        Map<String, String> params = job.getCustomConfigParameters();
+	@Test
+	void shouldReturnCustomConfigParams() {
+		// Given
+		ReportJob job = new ReportJob();
 
-        // Then
-        assertThat(params.size(), is(equalTo(7)));
-        assertThat(
-                params,
-                allOf(
-                        hasKey("template"),
-                        hasKey("reportFile"),
-                        hasKey("reportDir"),
-                        hasKey("reportTitle"),
-                        hasKey("reportDescription"),
-                        hasKey("theme"),
-                        hasKey("displayReport")));
-    }
+		// When
+		Map<String, String> params = job.getCustomConfigParameters();
 
-    @Test
-    void shouldApplyCustomConfigParams() {
-        // Given
-        String template = "template";
-        String reportFile = "reportFile";
-        String reportDir = "reportDir";
-        String reportTitle = "reportTitle";
-        String reportDescription = "reportDescription";
-        String theme = "theme";
-        Boolean displayReport = Boolean.TRUE;
-        ReportJob job =
-                createReportJob(
-                        "parameters:\n"
-                                + "  template: "
-                                + template
-                                + "\n"
-                                + "  reportFile: "
-                                + reportFile
-                                + "\n"
-                                + "  reportDir: "
-                                + reportDir
-                                + "\n"
-                                + "  reportTitle: "
-                                + reportTitle
-                                + "\n"
-                                + "  reportDescription: "
-                                + reportDescription
-                                + "\n"
-                                + "  theme: "
-                                + theme
-                                + "\n"
-                                + "  displayReport: "
-                                + displayReport);
-        AutomationProgress progress = new AutomationProgress();
+		// Then
+		assertThat(params.size(), is(equalTo(7)));
+		assertThat(params, allOf(hasKey("template"), hasKey("reportFile"), hasKey("reportDir"), hasKey("reportTitle"),
+				hasKey("reportDescription"), hasKey("theme"), hasKey("displayReport")));
+	}
 
-        // When
-        job.verifyParameters(progress);
+	@Test
+	void shouldApplyCustomConfigParams() {
+		// Given
+		String template = "template";
+		String reportFile = "reportFile";
+		String reportDir = "reportDir";
+		String reportTitle = "reportTitle";
+		String reportDescription = "reportDescription";
+		String theme = "theme";
+		Boolean displayReport = Boolean.TRUE;
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + template + "\n" + "  reportFile: "
+				+ reportFile + "\n" + "  reportDir: " + reportDir + "\n" + "  reportTitle: " + reportTitle + "\n"
+				+ "  reportDescription: " + reportDescription + "\n" + "  theme: " + theme + "\n" + "  displayReport: "
+				+ displayReport);
+		AutomationProgress progress = new AutomationProgress();
 
-        // Then
-        assertThat(job.getParameters().getTemplate(), is(equalTo(template)));
-        assertThat(job.getParameters().getReportFile(), is(equalTo(reportFile)));
-        assertThat(job.getParameters().getReportDir(), is(equalTo(reportDir)));
-        assertThat(job.getParameters().getReportTitle(), is(equalTo(reportTitle)));
-        assertThat(job.getParameters().getReportDescription(), is(equalTo(reportDescription)));
-        assertThat(job.getParameters().getTheme(), is(equalTo(theme)));
-        assertThat(job.getParameters().getDisplayReport(), is(equalTo(displayReport)));
-    }
+		// When
+		job.verifyParameters(progress);
 
-    @Test
-    void shouldReplaceVarInReportFileWhenRunning() throws IOException {
-        // Given
-        String templateName = "template";
-        String reportFile = "${reportFile}";
-        ReportJob job =
-                createReportJob(
-                        "parameters:\n"
-                                + "  template: "
-                                + templateName
-                                + "\n"
-                                + "  reportFile: "
-                                + reportFile);
-        AutomationPlan plan = new AutomationPlan();
-        AutomationProgress progress = plan.getProgress();
-        AutomationEnvironment env = plan.getEnv();
-        env.getData().getVars().put("reportFile", "report-file");
-        ContextWrapper contextWrapper = mock(ContextWrapper.class);
-        given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
-        env.setContexts(Arrays.asList(contextWrapper));
-        Template template = mock(Template.class);
-        given(template.getExtension()).willReturn("ext");
-        given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
-        given(extensionReports.generateReport(any(), any(), anyString(), anyBoolean()))
-                .willReturn(mock(File.class));
-        job.verifyParameters(progress);
-        job.setPlan(plan);
+		// Then
+		assertThat(job.getParameters().getTemplate(), is(equalTo(template)));
+		assertThat(job.getParameters().getReportFile(), is(equalTo(reportFile)));
+		assertThat(job.getParameters().getReportDir(), is(equalTo(reportDir)));
+		assertThat(job.getParameters().getReportTitle(), is(equalTo(reportTitle)));
+		assertThat(job.getParameters().getReportDescription(), is(equalTo(reportDescription)));
+		assertThat(job.getParameters().getTheme(), is(equalTo(theme)));
+		assertThat(job.getParameters().getDisplayReport(), is(equalTo(displayReport)));
+	}
 
-        // When
-        job.runJob(env, progress);
+	@Test
+	void shouldReplaceVarInReportFileWhenRunning() throws IOException {
+		// Given
+		String templateName = "template";
+		String reportFile = "${reportFile}";
+		ReportJob job = createReportJob(
+				"parameters:\n" + "  template: " + templateName + "\n" + "  reportFile: " + reportFile);
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		env.getData().getVars().put("reportFile", "report-file");
+		ContextWrapper contextWrapper = mock(ContextWrapper.class);
+		given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
+		env.setContexts(Arrays.asList(contextWrapper));
+		Template template = mock(Template.class);
+		given(template.getExtension()).willReturn("ext");
+		given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
+		given(extensionReports.generateReport(any(), any(), anyString(), anyBoolean())).willReturn(mock(File.class));
+		job.verifyParameters(progress);
+		job.setPlan(plan);
 
-        // Then
-        ArgumentCaptor<String> captorReportFileName = ArgumentCaptor.forClass(String.class);
-        verify(extensionReports)
-                .generateReport(any(), any(), captorReportFileName.capture(), anyBoolean());
-        assertThat(captorReportFileName.getValue(), endsWith(fsPath("report-file.ext")));
-        assertThat(progress.hasWarnings(), is(equalTo(false)));
-        assertThat(progress.hasErrors(), is(equalTo(false)));
-    }
+		// When
+		job.runJob(env, progress);
 
-    @Test
-    void shouldReplaceVarInReportDirWhenRunning() throws IOException {
-        // Given
-        String templateName = "template";
-        String reportFile = "report-file";
-        String reportDir = "${reportDir}";
-        ReportJob job =
-                createReportJob(
-                        "parameters:\n"
-                                + "  template: "
-                                + templateName
-                                + "\n"
-                                + "  reportFile: "
-                                + reportFile
-                                + "\n"
-                                + "  reportDir: "
-                                + reportDir);
-        AutomationPlan plan = new AutomationPlan();
-        AutomationProgress progress = plan.getProgress();
-        AutomationEnvironment env = plan.getEnv();
-        env.getData().getVars().put("reportDir", "report-dir");
-        ContextWrapper contextWrapper = mock(ContextWrapper.class);
-        given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
-        env.setContexts(Arrays.asList(contextWrapper));
-        Template template = mock(Template.class);
-        given(template.getExtension()).willReturn("ext");
-        given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
-        given(extensionReports.generateReport(any(), any(), anyString(), anyBoolean()))
-                .willReturn(mock(File.class));
-        job.verifyParameters(progress);
-        job.setPlan(plan);
+		// Then
+		ArgumentCaptor<String> captorReportFileName = ArgumentCaptor.forClass(String.class);
+		verify(extensionReports).generateReport(any(), any(), captorReportFileName.capture(), anyBoolean());
+		assertThat(captorReportFileName.getValue(), endsWith(fsPath("report-file.ext")));
+		assertThat(progress.hasWarnings(), is(equalTo(false)));
+		assertThat(progress.hasErrors(), is(equalTo(false)));
+	}
 
-        // When
-        job.runJob(env, progress);
+	@Test
+	void shouldReplaceVarInReportDirWhenRunning() throws IOException {
+		// Given
+		String templateName = "template";
+		String reportFile = "report-file";
+		String reportDir = "${reportDir}";
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + templateName + "\n" + "  reportFile: "
+				+ reportFile + "\n" + "  reportDir: " + reportDir);
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		env.getData().getVars().put("reportDir", "report-dir");
+		ContextWrapper contextWrapper = mock(ContextWrapper.class);
+		given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
+		env.setContexts(Arrays.asList(contextWrapper));
+		Template template = mock(Template.class);
+		given(template.getExtension()).willReturn("ext");
+		given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
+		given(extensionReports.generateReport(any(), any(), anyString(), anyBoolean())).willReturn(mock(File.class));
+		job.verifyParameters(progress);
+		job.setPlan(plan);
 
-        // Then
-        ArgumentCaptor<String> captorReportFileName = ArgumentCaptor.forClass(String.class);
-        verify(extensionReports)
-                .generateReport(any(), any(), captorReportFileName.capture(), anyBoolean());
-        assertThat(
-                captorReportFileName.getValue(), endsWith(fsPath("report-dir", "report-file.ext")));
-        assertThat(progress.hasWarnings(), is(equalTo(false)));
-        assertThat(progress.hasErrors(), is(equalTo(false)));
-    }
+		// When
+		job.runJob(env, progress);
 
-    @Test
-    void shouldSupportRelativeDirName() throws IOException {
-        // Given
-        String templateName = "template";
-        String reportFile = "report-file";
-        File planFile = Files.createTempFile("plan", ".yaml").toFile();
-        ReportJob job =
-                createReportJob(
-                        "parameters:\n"
-                                + "  template: "
-                                + templateName
-                                + "\n"
-                                + "  reportFile: "
-                                + reportFile
-                                + "\n"
-                                + "  reportDir: test");
-        AutomationPlan plan = new AutomationPlan();
-        AutomationProgress progress = plan.getProgress();
-        AutomationEnvironment env = plan.getEnv();
-        ContextWrapper contextWrapper = mock(ContextWrapper.class);
-        given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
-        env.setContexts(Arrays.asList(contextWrapper));
-        Template template = mock(Template.class);
-        given(template.getExtension()).willReturn("ext");
-        given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
-        given(extensionReports.generateReport(any(), any(), anyString(), anyBoolean()))
-                .willReturn(mock(File.class));
-        plan.setFile(planFile);
-        job.verifyParameters(progress);
-        job.setPlan(plan);
+		// Then
+		ArgumentCaptor<String> captorReportFileName = ArgumentCaptor.forClass(String.class);
+		verify(extensionReports).generateReport(any(), any(), captorReportFileName.capture(), anyBoolean());
+		assertThat(captorReportFileName.getValue(), endsWith(fsPath("report-dir", "report-file.ext")));
+		assertThat(progress.hasWarnings(), is(equalTo(false)));
+		assertThat(progress.hasErrors(), is(equalTo(false)));
+	}
 
-        // When
-        job.runJob(env, progress);
+	@Test
+	void shouldSupportRelativeDirName() throws IOException {
+		// Given
+		String templateName = "template";
+		String reportFile = "report-file";
+		File planFile = Files.createTempFile("plan", ".yaml").toFile();
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + templateName + "\n" + "  reportFile: "
+				+ reportFile + "\n" + "  reportDir: test");
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		ContextWrapper contextWrapper = mock(ContextWrapper.class);
+		given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
+		env.setContexts(Arrays.asList(contextWrapper));
+		Template template = mock(Template.class);
+		given(template.getExtension()).willReturn("ext");
+		given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
+		given(extensionReports.generateReport(any(), any(), anyString(), anyBoolean())).willReturn(mock(File.class));
+		plan.setFile(planFile);
+		job.verifyParameters(progress);
+		job.setPlan(plan);
 
-        // Then
-        ArgumentCaptor<String> captorReportFileName = ArgumentCaptor.forClass(String.class);
-        verify(extensionReports)
-                .generateReport(any(), any(), captorReportFileName.capture(), anyBoolean());
-        assertThat(
-                captorReportFileName.getValue().startsWith(planFile.getParent()),
-                is(equalTo(true)));
-        assertThat(progress.hasWarnings(), is(equalTo(false)));
-        assertThat(progress.hasErrors(), is(equalTo(false)));
-    }
+		// When
+		job.runJob(env, progress);
 
-    @Test
-    void shouldErrorOnInvalidTemplate() throws Exception {
-        // Given
-        String templateName = "template-a";
-        ReportJob job =
-                createReportJob(
-                        "parameters:\n"
-                                + "  template: "
-                                + templateName
-                                + "\n"
-                                + "  reportFile: report-file"
-                                + "\n"
-                                + "  reportDir: test");
-        AutomationPlan plan = new AutomationPlan();
-        AutomationProgress progress = plan.getProgress();
-        AutomationEnvironment env = plan.getEnv();
-        var templates = List.of("template-b", "template-c");
-        given(extensionReports.getTemplateConfigNames()).willReturn(templates);
-        job.verifyParameters(progress);
-        job.setPlan(plan);
+		// Then
+		ArgumentCaptor<String> captorReportFileName = ArgumentCaptor.forClass(String.class);
+		verify(extensionReports).generateReport(any(), any(), captorReportFileName.capture(), anyBoolean());
+		assertThat(captorReportFileName.getValue().startsWith(planFile.getParent()), is(equalTo(true)));
+		assertThat(progress.hasWarnings(), is(equalTo(false)));
+		assertThat(progress.hasErrors(), is(equalTo(false)));
+	}
 
-        // When
-        job.runJob(env, progress);
+	@Test
+	void shouldErrorOnInvalidTemplate() throws Exception {
+		// Given
+		String templateName = "template-a";
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + templateName + "\n"
+				+ "  reportFile: report-file" + "\n" + "  reportDir: test");
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		var templates = List.of("template-b", "template-c");
+		given(extensionReports.getTemplateConfigNames()).willReturn(templates);
+		job.verifyParameters(progress);
+		job.setPlan(plan);
 
-        // Then
-        assertThat(progress.hasWarnings(), is(equalTo(false)));
-        assertThat(progress.hasErrors(), is(equalTo(true)));
-        assertThat(
-                progress.getErrors().get(0),
-                allOf(
-                        containsString("invalid"),
-                        containsString(templateName),
-                        containsString(templates.toString())));
-    }
+		// When
+		job.runJob(env, progress);
 
-    private static ReportJob createReportJob(String data) {
-        ReportJob job = new ReportJob();
-        job.setJobData(new Yaml().load(data));
-        return job;
-    }
+		// Then
+		assertThat(progress.hasWarnings(), is(equalTo(false)));
+		assertThat(progress.hasErrors(), is(equalTo(true)));
+		assertThat(progress.getErrors().get(0),
+				allOf(containsString("invalid"), containsString(templateName), containsString(templates.toString())));
+	}
 
-    private static String fsPath(String... elements) {
-        String separator = FileSystems.getDefault().getSeparator();
-        return separator + String.join(separator, elements);
-    }
+	@Test
+	void shouldIncludeAllSitesByDefault() throws IOException {
+		// Given
+		String templateName = "template";
+		File planFile = Files.createTempFile("plan", ".yaml").toFile();
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + templateName + "\n" + 
+				"  reportFile: report-file\n  reportDir: repord-dir");
+
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		ContextWrapper contextWrapper = mock(ContextWrapper.class);
+		given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
+		env.setContexts(Arrays.asList(contextWrapper));
+		Template template = mock(Template.class);
+		given(template.getExtension()).willReturn("ext");
+		given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
+		plan.setFile(planFile);
+
+		try (MockedStatic<ExtensionReports> extReport = Mockito.mockStatic(ExtensionReports.class)) {
+			extReport.when(ExtensionReports::getSites)
+					.thenReturn(Arrays.asList("https://example1.com", "https://example2.org"));
+			extReport.when(() -> ExtensionReports.getNameFromPattern(anyString(), anyString())).thenReturn("filename");
+
+			ArgumentCaptor<ReportData> reportDataCapture = ArgumentCaptor.forClass(ReportData.class);
+			given(extensionReports.generateReport(reportDataCapture.capture(), any(), anyString(), anyBoolean()))
+					.willReturn(mock(File.class));
+
+			job.verifyParameters(progress);
+			job.setPlan(plan);
+
+			// When
+			job.runJob(env, progress);
+
+			// Then
+			List<String> sites = reportDataCapture.getValue().getSites();
+			assertThat(sites.size(), is(equalTo(2)));
+			assertThat(sites.get(0), is(equalTo("https://example1.com")));
+			assertThat(sites.get(1), is(equalTo("https://example2.org")));
+			assertThat(progress.hasWarnings(), is(equalTo(false)));
+			assertThat(progress.hasErrors(), is(equalTo(false)));
+		}
+	}
+
+	@Test
+	void shouldIncludeOnlySpecifiedSites() throws IOException {
+		// Given
+		String templateName = "template";
+		File planFile = Files.createTempFile("plan", ".yaml").toFile();
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + templateName + "\n" + 
+				"  reportFile: report-file\n" +
+				"  reportDir: report-dir\n" +
+				"sites:\n - example2");
+
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		ContextWrapper contextWrapper = mock(ContextWrapper.class);
+		given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
+		env.setContexts(Arrays.asList(contextWrapper));
+		Template template = mock(Template.class);
+		given(template.getExtension()).willReturn("ext");
+		given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
+		plan.setFile(planFile);
+
+		try (MockedStatic<ExtensionReports> extReport = Mockito.mockStatic(ExtensionReports.class)) {
+			extReport.when(ExtensionReports::getSites)
+					.thenReturn(Arrays.asList("https://example1.com", "https://example2.org"));
+			extReport.when(() -> ExtensionReports.getNameFromPattern(anyString(), anyString())).thenReturn("filename");
+
+			ArgumentCaptor<ReportData> reportDataCapture = ArgumentCaptor.forClass(ReportData.class);
+			given(extensionReports.generateReport(reportDataCapture.capture(), any(), anyString(), anyBoolean()))
+					.willReturn(mock(File.class));
+
+			job.verifyParameters(progress);
+			job.setPlan(plan);
+
+			// When
+			job.runJob(env, progress);
+
+			// Then
+			List<String> sites = reportDataCapture.getValue().getSites();
+			assertThat(sites.size(), is(equalTo(1)));
+			assertThat(sites.get(0), is(equalTo("https://example2.org")));
+			assertThat(progress.hasWarnings(), is(equalTo(false)));
+			assertThat(progress.hasErrors(), is(equalTo(false)));
+		}
+	}
+
+	@Test
+	void shouldWarnIfUnknownSiteString() throws IOException {
+		// Given
+		String templateName = "template";
+		File planFile = Files.createTempFile("plan", ".yaml").toFile();
+		ReportJob job = createReportJob("parameters:\n" + "  template: " + templateName + "\n" + 
+				"  reportFile: report-file\n" +
+				"  reportDir: report-dir\n" +
+				"sites:\n - example3");
+
+		AutomationPlan plan = new AutomationPlan();
+		AutomationProgress progress = plan.getProgress();
+		AutomationEnvironment env = plan.getEnv();
+		ContextWrapper contextWrapper = mock(ContextWrapper.class);
+		given(contextWrapper.getUrls()).willReturn(Collections.singletonList(""));
+		env.setContexts(Arrays.asList(contextWrapper));
+		Template template = mock(Template.class);
+		given(template.getExtension()).willReturn("ext");
+		given(extensionReports.getTemplateByConfigName(templateName)).willReturn(template);
+		plan.setFile(planFile);
+
+		try (MockedStatic<ExtensionReports> extReport = Mockito.mockStatic(ExtensionReports.class)) {
+			extReport.when(ExtensionReports::getSites)
+					.thenReturn(Arrays.asList("https://example1.com", "https://example2.org"));
+			extReport.when(() -> ExtensionReports.getNameFromPattern(anyString(), anyString())).thenReturn("filename");
+
+			ArgumentCaptor<ReportData> reportDataCapture = ArgumentCaptor.forClass(ReportData.class);
+			given(extensionReports.generateReport(reportDataCapture.capture(), any(), anyString(), anyBoolean()))
+					.willReturn(mock(File.class));
+
+			job.verifyParameters(progress);
+			job.setPlan(plan);
+
+			// When
+			job.runJob(env, progress);
+
+			// Then
+			List<String> sites = reportDataCapture.getValue().getSites();
+			assertThat(sites.size(), is(equalTo(0)));
+			assertThat(progress.hasWarnings(), is(equalTo(true)));
+			assertThat(progress.getWarnings().size(), is(equalTo(1)));
+			assertThat(progress.getWarnings().get(0), is(equalTo(
+					"Job report invalid site example3, valid sites: [https://example1.com, https://example2.org]")));
+			assertThat(progress.hasErrors(), is(equalTo(false)));
+		}
+	}
+
+	private static ReportJob createReportJob(String data) {
+		ReportJob job = new ReportJob();
+		job.setJobData(new Yaml().load(data));
+		return job;
+	}
+
+	private static String fsPath(String... elements) {
+		String separator = FileSystems.getDefault().getSeparator();
+		return separator + String.join(separator, elements);
+	}
 }
