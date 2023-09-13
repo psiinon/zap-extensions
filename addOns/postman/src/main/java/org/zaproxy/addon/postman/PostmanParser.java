@@ -24,12 +24,33 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.URIException;
 import org.apache.commons.io.FileUtils;
 import org.parosproxy.paros.Constant;
+import org.parosproxy.paros.network.HttpHeader;
+import org.parosproxy.paros.network.HttpMalformedHeaderException;
+import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpSender;
+import org.zaproxy.addon.postman.models.AbstractItem;
+import org.zaproxy.addon.postman.models.Body;
+import org.zaproxy.addon.postman.models.Body.FormData;
+import org.zaproxy.addon.postman.models.Body.GraphQl;
+import org.zaproxy.addon.postman.models.Item;
+import org.zaproxy.addon.postman.models.ItemGroup;
+import org.zaproxy.addon.postman.models.KeyValueData;
 import org.zaproxy.addon.postman.models.PostmanCollection;
+import org.zaproxy.addon.postman.models.Request;
+import org.zaproxy.addon.postman.models.Request.Url;
 
 public class PostmanParser {
 
@@ -75,7 +96,10 @@ public class PostmanParser {
     public void importCollection(String collection) throws JsonProcessingException {
         PostmanCollection postmanCollection = parse(collection);
 
-        // TODO: Extract list of HttpMessage from PostmanCollection and send requests
+        List<HttpMessage> httpMessages = new ArrayList<>();
+        extractHttpMessages(postmanCollection.getItem(), httpMessages);
+
+        requestor.run(httpMessages);
     }
 
     public PostmanCollection parse(String collectionJson) throws JsonProcessingException {
@@ -83,7 +107,243 @@ public class PostmanParser {
         return objectMapper.readValue(collectionJson, PostmanCollection.class);
     }
 
+    public static void extractHttpMessages(
+            List<AbstractItem> items, List<HttpMessage> httpMessages) {
+        for (AbstractItem item : items) {
+            if (item instanceof Item) {
+                HttpMessage httpMessage = extractHttpMessage((Item) item);
+                if (httpMessage != null) {
+                    httpMessages.add(httpMessage);
+                }
+            } else if (item instanceof ItemGroup) {
+                extractHttpMessages(((ItemGroup) item).getItem(), httpMessages);
+            }
+        }
+    }
+
     private static boolean isSupportedScheme(String scheme) {
         return "http".equalsIgnoreCase(scheme) || "https".equalsIgnoreCase(scheme);
+    }
+
+    private static boolean isContentTypeAlreadySet(List<KeyValueData> headers) {
+        if (headers != null) {
+            for (KeyValueData header : headers) {
+                if (header.getKey().equalsIgnoreCase(HttpHeader.CONTENT_TYPE)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    public static HttpMessage extractHttpMessage(Item item) {
+        Request request = item.getRequest();
+        if (request == null) {
+            return null;
+        }
+
+        Url url = request.getUrl();
+        if (url == null) {
+            return null;
+        }
+
+        HttpMessage httpMessage;
+        try {
+            String rawUrl = url.getRaw();
+            httpMessage = new HttpMessage(new URI(rawUrl, false));
+        } catch (URIException | HttpMalformedHeaderException | NullPointerException e) {
+            return null;
+        }
+
+        httpMessage.getRequestHeader().setMethod(request.getMethod());
+
+        List<KeyValueData> headers = request.getHeader();
+        if (headers != null) {
+            for (KeyValueData header : request.getHeader()) {
+                if (!header.isDisabled()) {
+                    httpMessage.getRequestHeader().setHeader(header.getKey(), header.getValue());
+                }
+            }
+        }
+
+        Body body = request.getBody();
+        if (body == null || body.isDisabled()) {
+            return httpMessage;
+        }
+
+        String mode = body.getMode();
+        if (mode == null) {
+            return httpMessage;
+        }
+
+        String bodyContent = "";
+        String contentType = "";
+
+        if (mode.equals(Body.RAW)) {
+            if (body.getRaw() == null) {
+                return httpMessage;
+            }
+
+            Map<String, String> contentTypeMap =
+                    Map.of(
+                            "html", "text/html",
+                            "javascript", "application/javascript",
+                            "json", "application/json",
+                            "xml", "application/xml");
+
+            contentType = "text/plain";
+
+            if (body.getOptions() != null && body.getOptions().getRaw() != null) {
+                String language = body.getOptions().getRaw().getLanguage();
+
+                if (language != null) {
+                    contentType =
+                            contentTypeMap.getOrDefault(
+                                    language.toLowerCase(Locale.ROOT), "text/html");
+                }
+            }
+
+            bodyContent = body.getRaw();
+        } else if (mode.equals(Body.URL_ENCODED)) {
+            if (body.getUrlencoded() == null) {
+                return httpMessage;
+            }
+
+            contentType = HttpHeader.FORM_URLENCODED_CONTENT_TYPE;
+
+            StringBuilder urlencodedBodySB = new StringBuilder();
+
+            for (KeyValueData data : body.getUrlencoded()) {
+                if (!data.isDisabled()) {
+                    if (urlencodedBodySB.length() > 0) {
+                        urlencodedBodySB.append('&');
+                    }
+                    try {
+                        urlencodedBodySB
+                                .append(
+                                        URLEncoder.encode(
+                                                data.getKey(), StandardCharsets.UTF_8.name()))
+                                .append('=')
+                                .append(
+                                        URLEncoder.encode(
+                                                data.getValue(), StandardCharsets.UTF_8.name()));
+                    } catch (UnsupportedEncodingException e) {
+                    }
+                }
+            }
+
+            bodyContent = urlencodedBodySB.toString();
+        } else if (mode.equals(Body.FORM_DATA)) {
+            if (body.getFormData() == null) {
+                return httpMessage;
+            }
+
+            String boundary = "----" + System.currentTimeMillis();
+
+            contentType = "multipart/form-data; boundary=" + boundary;
+
+            StringBuilder formDataBodySB = new StringBuilder();
+            for (FormData formData : body.getFormData()) {
+                if (!formData.isDisabled()) {
+                    formDataBodySB
+                            .append(generateMultiPartBody(formData, boundary))
+                            .append(HttpHeader.CRLF);
+                }
+            }
+
+            formDataBodySB.append("--").append(boundary).append("--").append(HttpHeader.CRLF);
+
+            bodyContent = formDataBodySB.toString();
+        } else if (mode.equals(Body.FILE)) {
+            if (body.getFile() == null) {
+                return httpMessage;
+            }
+
+            String src = body.getFile().getSrc();
+
+            contentType = getFileContentType(src);
+
+            try {
+                bodyContent = FileUtils.readFileToString(new File(src), StandardCharsets.UTF_8);
+            } catch (IOException e1) {
+            }
+        } else if (mode.equals(Body.GRAPHQL)) {
+            if (body.getGraphQl() == null) {
+                return httpMessage;
+            }
+
+            contentType = HttpHeader.JSON_CONTENT_TYPE;
+
+            GraphQl graphQlBody = body.getGraphQl();
+            String query = graphQlBody.getQuery().replaceAll("\r\n", "\\\\r\\\\n");
+            String variables = graphQlBody.getVariables().replaceAll("\\s", "");
+
+            bodyContent = String.format("{\"query\":\"%s\", \"variables\":%s}", query, variables);
+        }
+
+        if (!isContentTypeAlreadySet(request.getHeader())) {
+            httpMessage.getRequestHeader().setHeader(HttpHeader.CONTENT_TYPE, contentType);
+        }
+
+        httpMessage.getRequestBody().setBody(bodyContent.toString());
+        httpMessage.getRequestHeader().setContentLength(httpMessage.getRequestBody().length());
+
+        return httpMessage;
+    }
+
+    private static String generateMultiPartBody(FormData formData, String boundary) {
+        StringBuilder multipartDataSB = new StringBuilder();
+
+        multipartDataSB.append("--").append(boundary).append(HttpHeader.CRLF);
+        multipartDataSB
+                .append("Content-Disposition: form-data; name=\"")
+                .append(formData.getKey())
+                .append("\"");
+
+        if ("file".equals(formData.getType())) {
+            File file = new File(formData.getSrc());
+            if (!file.exists() || !file.canRead() || !file.isFile()) {
+                return "";
+            }
+
+            multipartDataSB
+                    .append("; filename=\"")
+                    .append(file.getName())
+                    .append("\"")
+                    .append(HttpHeader.CRLF);
+
+            String propertyContentType = getFileContentType(formData.getSrc());
+            if (!propertyContentType.isEmpty()) {
+                multipartDataSB
+                        .append(HttpHeader.CONTENT_TYPE + ": ")
+                        .append(propertyContentType)
+                        .append(HttpHeader.CRLF);
+            }
+
+            multipartDataSB.append(HttpHeader.CRLF);
+
+            try {
+                String defn = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
+                multipartDataSB.append(defn);
+            } catch (IOException e) {
+                return "";
+            }
+        } else {
+            multipartDataSB
+                    .append(HttpHeader.CRLF)
+                    .append(HttpHeader.CRLF)
+                    .append(formData.getValue());
+        }
+
+        return multipartDataSB.toString();
+    }
+
+    private static String getFileContentType(String value) {
+        try {
+            String osAppropriatePath = value.startsWith("/") ? value.substring(1) : value;
+            return Files.probeContentType(Paths.get(osAppropriatePath));
+        } catch (IOException e) {
+            return "";
+        }
     }
 }
