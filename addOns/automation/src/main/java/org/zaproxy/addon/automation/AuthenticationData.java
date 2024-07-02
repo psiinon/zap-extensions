@@ -30,6 +30,7 @@ import java.util.Map.Entry;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -57,6 +58,7 @@ public class AuthenticationData extends AutomationData {
     public static final String METHOD_SCRIPT = "script";
     public static final String METHOD_BROWSER = "browser";
     public static final String METHOD_AUTO = "autodetect";
+    public static final String METHOD_CLIENT = "client";
 
     public static final String PARAM_HOSTNAME = "hostname";
     public static final String PARAM_REALM = "realm";
@@ -71,6 +73,9 @@ public class AuthenticationData extends AutomationData {
 
     protected static final String BROWSER_BASED_AUTH_METHOD_CLASSNAME =
             "org.zaproxy.addon.authhelper.BrowserBasedAuthenticationMethodType.BrowserBasedAuthenticationMethod";
+
+    protected static final String CLIENT_SCRIPT_BASED_AUTH_METHOD_CLASSNAME =
+            "org.zaproxy.addon.authhelper.client.ClientScriptBasedAuthenticationMethodType.ClientScriptBasedAuthenticationMethod";
 
     /** Field name in the underlying PostBasedAuthenticationMethod class * */
     protected static final String FIELD_LOGIN_REQUEST_URL = "loginRequestURL";
@@ -87,7 +92,8 @@ public class AuthenticationData extends AutomationData {
                     METHOD_JSON,
                     METHOD_SCRIPT,
                     METHOD_BROWSER,
-                    METHOD_AUTO);
+                    METHOD_AUTO,
+                    METHOD_CLIENT);
 
     private String method;
     private Map<String, Object> parameters = new LinkedHashMap<>();
@@ -121,6 +127,27 @@ public class AuthenticationData extends AutomationData {
             JobUtils.addPrivateField(
                     parameters, PARAM_LOGIN_REQUEST_URL, FIELD_LOGIN_REQUEST_URL, jsonAuthMethod);
             JobUtils.addPrivateField(parameters, PARAM_LOGIN_REQUEST_BODY, jsonAuthMethod);
+        } else if (authMethod != null
+                && authMethod
+                        .getClass()
+                        .getCanonicalName()
+                        .equals(CLIENT_SCRIPT_BASED_AUTH_METHOD_CLASSNAME)) {
+            // Plan to change once the core supports dynamic methods better
+            // TODO WIP
+            ScriptWrapper sw = (ScriptWrapper) JobUtils.getPrivateField(authMethod, "script");
+            LOGGER.info("SBSB matched client script class"); // TODO
+            if (sw != null) {
+                setMethod(METHOD_CLIENT);
+                parameters.put(PARAM_SCRIPT, sw.getFile().getAbsolutePath());
+                parameters.put(PARAM_SCRIPT_ENGINE, sw.getEngineName());
+                @SuppressWarnings("unchecked")
+                Map<String, String> paramValues =
+                        (Map<String, String>) JobUtils.getPrivateField(authMethod, "paramValues");
+                for (Entry<String, String> entry : paramValues.entrySet()) {
+                    parameters.put(entry.getKey(), entry.getValue());
+                }
+                LOGGER.info("SBSB loaded data?"); // TODO
+            }
         } else if (authMethod instanceof ScriptBasedAuthenticationMethod) {
             ScriptBasedAuthenticationMethod scriptAuthMethod =
                     (ScriptBasedAuthenticationMethod) authMethod;
@@ -291,6 +318,14 @@ public class AuthenticationData extends AutomationData {
                                             .get(AuthenticationData.PARAM_LOGIN_REQUEST_BODY)));
                     context.setAuthenticationMethod(jsonAuthMethod);
                     break;
+                case AuthenticationData.METHOD_CLIENT:
+                    /*
+                    // TODO .. will need to use reflection?
+                       AuthenticationMethodType authClientType =
+                       	extAuth.getAuthenticationMethodTypeForIdentifier(7);
+
+                    break;
+                    */
                 case AuthenticationData.METHOD_SCRIPT:
                     File f =
                             JobUtils.getFile(
@@ -308,9 +343,20 @@ public class AuthenticationData extends AutomationData {
                                         ScriptBasedAuthenticationMethodType.SCRIPT_TYPE_AUTH,
                                         parameters.getOrDefault(PARAM_SCRIPT_ENGINE, "").toString(),
                                         progress);
-                        ScriptBasedAuthenticationMethodType scriptType =
-                                new ScriptBasedAuthenticationMethodType();
-                        ScriptBasedAuthenticationMethod scriptMethod =
+
+                        AuthenticationMethodType scriptType;
+
+                        if (getMethod()
+                                .toLowerCase(Locale.ROOT)
+                                .equals(AuthenticationData.METHOD_SCRIPT)) {
+                            scriptType = new ScriptBasedAuthenticationMethodType();
+                            LOGGER.info("SBSB loaded script auth method type"); // TODO
+
+                        } else {
+                            scriptType = extAuth.getAuthenticationMethodTypeForIdentifier(8);
+                            LOGGER.info("SBSB loaded CLIENT script auth method type " + scriptType); // TODO
+                        }
+                        AuthenticationMethod scriptMethod =
                                 scriptType.createAuthenticationMethod(context.getId());
 
                         if (sw == null) {
@@ -321,7 +367,13 @@ public class AuthenticationData extends AutomationData {
                                             "automation.error.env.auth.script.bad",
                                             f.getAbsolutePath()));
                         } else {
-                            scriptMethod.loadScript(sw);
+                            try {
+                                // TODO why is this failing??
+                                MethodUtils.invokeMethod(scriptMethod, "loadScript", sw);
+                            } catch (Exception e) {
+                                LOGGER.error(e.getMessage(), e);
+                            }
+                            // scriptMethod.loadScript(sw);
                             JobUtils.setPrivateField(
                                     scriptMethod, "paramValues", getScriptParameters(env));
 

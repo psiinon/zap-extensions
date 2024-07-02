@@ -24,6 +24,7 @@ import java.awt.Frame;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import org.apache.logging.log4j.LogManager;
@@ -146,6 +147,8 @@ public class ZestRecordScriptDialog extends StandardFieldsDialog {
                 list.add(Constant.messages.getString(st.getI18nKey()));
             }
         }
+        // Alphabetic order best, and it just so happens Auth scripts will appear at the top
+        Collections.sort(list);
 
         return list;
     }
@@ -173,11 +176,12 @@ public class ZestRecordScriptDialog extends StandardFieldsDialog {
     }
 
     private List<String> getBrowsers() {
+        // TODO fix to use right i18n names - ExtensionSelenium.getName(Browser)
         List<String> browsers = new ArrayList<>();
-        // String firefox = Browser.FIREFOX.getId();
+        String firefox = Browser.FIREFOX.getId();
         String chrome = Browser.CHROME.getId();
 
-        // browsers.add(Character.toUpperCase(firefox.charAt(0)) + firefox.substring(1));
+        browsers.add(Character.toUpperCase(firefox.charAt(0)) + firefox.substring(1));
         browsers.add(Character.toUpperCase(chrome.charAt(0)) + chrome.substring(1));
         return browsers;
     }

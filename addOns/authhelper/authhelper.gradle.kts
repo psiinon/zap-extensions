@@ -22,6 +22,24 @@ zapAddOn {
                     }
                 }
             }
+            register("org.zaproxy.addon.authhelper.client.ExtensionAuthhelperClient") {
+                classnames {
+                    allowed.set(listOf("org.zaproxy.addon.authhelper.client"))
+                }
+                dependencies {
+                    addOns {
+                        register("spiderAjax") {
+                            version.set(">=23.15.0")
+                        }
+                        register("scripts") {
+                            version.set(">=45.4.0")
+                        }
+                        register("zest") {
+                            version.set(">=47")
+                        }
+                    }
+                }
+            }
         }
         dependencies {
             addOns {
@@ -52,6 +70,16 @@ dependencies {
     zapAddOn("network")
     zapAddOn("selenium")
     zapAddOn("spiderAjax")
+    zapAddOn("zest")
+
+    implementation("org.zaproxy:zest:0.22.0") {
+        // Provided by commonlib add-on.
+        exclude(group = "com.fasterxml.jackson")
+        // Provided by Selenium add-on.
+        exclude(group = "org.seleniumhq.selenium")
+        // Provided by ZAP.
+        exclude(group = "net.htmlparser.jericho", module = "jericho-html")
+    }
 
     testImplementation(project(":testutils"))
 }

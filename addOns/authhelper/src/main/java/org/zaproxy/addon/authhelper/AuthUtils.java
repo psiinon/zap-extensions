@@ -582,7 +582,7 @@ public class AuthUtils {
         return findSessionTokenSource(token, -1);
     }
 
-    static SessionManagementRequestDetails findSessionTokenSource(String token, int firstId) {
+    public static SessionManagementRequestDetails findSessionTokenSource(String token, int firstId) {
         ExtensionHistory extHist = AuthUtils.getExtension(ExtensionHistory.class);
         int lastId = extHist.getLastHistoryId();
         if (firstId == -1) {
@@ -765,6 +765,7 @@ public class AuthUtils {
         AuthenticationBrowserHook(Context context, User user) {
             this.context = context;
             AuthenticationMethod method = context.getAuthenticationMethod();
+            // TODO handle Zest scripts here too, or in a similar way?
             if (!(method instanceof BrowserBasedAuthenticationMethod)) {
                 throw new IllegalStateException("Unsupported method " + method.getType().getName());
             }
@@ -780,6 +781,7 @@ public class AuthUtils {
 
         @Override
         public void browserLaunched(SeleniumScriptUtils ssutils) {
+            // TODO handle Zest scripts here too, or in a similar way?
             LOGGER.debug(
                     "AuthenticationBrowserHook - authenticating as {}", userCreds.getUsername());
             AuthUtils.authenticateAsUser(
