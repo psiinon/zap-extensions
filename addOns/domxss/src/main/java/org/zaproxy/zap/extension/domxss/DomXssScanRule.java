@@ -67,6 +67,7 @@ import org.zaproxy.addon.network.server.HttpMessageHandlerContext;
 import org.zaproxy.addon.network.server.Server;
 import org.zaproxy.zap.extension.selenium.Browser;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
+import org.zaproxy.zap.model.Context;
 import org.zaproxy.zap.utils.Stats;
 
 public class DomXssScanRule extends AbstractAppParamPlugin {
@@ -138,6 +139,8 @@ public class DomXssScanRule extends AbstractAppParamPlugin {
     static ExtensionNetwork extensionNetwork;
 
     static Server proxy = null;
+    
+    
     private static int proxyPort = -1;
 
     private WebDriverWrapper driver;
@@ -230,7 +233,15 @@ public class DomXssScanRule extends AbstractAppParamPlugin {
                                 @Override
                                 public void handleMessage(
                                         HttpMessageHandlerContext ctx, HttpMessage msg) {
-                                    if (isExcluded(msg)) {
+                                	String uri = msg.getRequestHeader().getURI().toString();
+                                    if (isExcludedGlobally(uri)) {
+                                    	System.out.println("SBSB global exclude " + uri); // TODO
+                                        return;
+                                    }
+                            		System.out.println("SBSB rule parent is " + getParent().hashCode()); // TODO
+                                    if (isExcludedByContext(uri, getParent().getContext())) {
+                                    	System.out.println("SBSB context exclude " + uri); // TODO
+                                	  	ctx.close();
                                         return;
                                     }
 
@@ -238,8 +249,8 @@ public class DomXssScanRule extends AbstractAppParamPlugin {
 
                                     try {
                                         // Ideally it should check that the message belongs
-                                        // to the scanned
-                                        // target before sending
+                                        // to the scanned target before sending
+                                    	System.out.println("SBSB requesting " + uri); // TODO
                                         sendAndReceive(msg);
                                     } catch (IOException e) {
                                         LOGGER.debug(e);
@@ -255,14 +266,23 @@ public class DomXssScanRule extends AbstractAppParamPlugin {
         return proxy;
     }
 
-    private static boolean isExcluded(HttpMessage msg) {
-        String uri = msg.getRequestHeader().getURI().toString();
+    private static boolean isExcludedGlobally(String uri) {
         List<String> exclusions = Model.getSingleton().getSession().getGlobalExcludeURLRegexs();
         for (String regex : exclusions) {
             if (Pattern.matches(regex, uri)) {
                 return true;
             }
         }
+        return false;
+    }
+
+    private static boolean isExcludedByContext(String uri, Context context) {
+    	System.out.println("SBSB isExcludedByContext " + context + " " + uri); // TODO
+        if (context != null && context.isExcluded(uri)) {
+        	System.out.println("SBSB isExcludedByContext YES"); // TODO
+            return true;
+        }
+    	System.out.println("SBSB isExcludedByContext NO"); // TODO
         return false;
     }
 
