@@ -21,13 +21,14 @@ package org.zaproxy.addon.authhelper;
 
 import java.awt.GridBagLayout;
 import java.lang.reflect.Method;
+import java.net.HttpCookie;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import net.sf.json.JSONObject;
+
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
@@ -42,6 +43,7 @@ import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.addon.authhelper.BrowserBasedAuthenticationMethodType.BrowserBasedAuthenticationMethod;
+import org.zaproxy.addon.authhelper.ClientScriptBasedAuthenticationMethodType.ClientScriptBasedAuthenticationMethod;
 import org.zaproxy.addon.network.internal.client.LegacyUtils;
 import org.zaproxy.zap.authentication.AuthenticationMethod;
 import org.zaproxy.zap.extension.api.ApiDynamicActionImplementor;
@@ -56,11 +58,14 @@ import org.zaproxy.zap.session.AbstractSessionManagementMethodOptionsPanel;
 import org.zaproxy.zap.session.SessionManagementMethod;
 import org.zaproxy.zap.session.SessionManagementMethodType;
 import org.zaproxy.zap.session.WebSession;
+import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.ApiUtils;
 import org.zaproxy.zap.utils.EncodingUtils;
 import org.zaproxy.zap.utils.Pair;
 import org.zaproxy.zap.utils.Stats;
 import org.zaproxy.zap.view.LayoutHelper;
+
+import net.sf.json.JSONObject;
 
 /**
  * The type corresponding to a {@link org.zaproxy.zap.session.SessionManagementMethod} for web
@@ -151,8 +156,16 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
             for (Pair<String, String> hc : this.headerConfigs) {
                 headers.add(new Pair<>(hc.first, replaceTokens(hc.second, tokens)));
             }
-
-            return new HttpHeaderBasedSession(headers);
+            
+            User user = msg.getRequestingUser();
+            if (user != null) {
+            	System.out.println("SBSB extractWebSession using user state"); // TODO
+                return new HttpHeaderBasedSession(headers, user.getCorrespondingHttpState());
+            } else {
+            	System.out.println("SBSB extractWebSession NOT using user state"); // TODO
+                return new HttpHeaderBasedSession(headers);
+            	
+            }
         }
 
         @Override
@@ -189,7 +202,31 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
                         hbSession.getHeaders().size());
                 for (Pair<String, String> header : hbSession.getHeaders()) {
                     Stats.incCounter("stats.auth.session.set.header");
-                    message.getRequestHeader().setHeader(header.first, header.second);
+                    if ("cookie".equalsIgnoreCase(header.first)) {
+                    	// TODO Hacking..
+                    	System.out.println("SBSB hacking with cookie " + header.second); // TODO
+                    	String[] cookies = header.second.split(";");
+                    	List<HttpCookie> cookieList = new ArrayList<>();
+                    	for (String cookie : cookies) {
+                    		String[] kv = cookie.split("=", 2);
+                        	System.out.println("SBSB testing cookie " + cookie + " len=" + kv.length); // TODO
+                    		if (kv.length >= 2) {
+                    			// if (kv[1].contains("{%")) {
+                    			if (! kv[0].contains("AWS")) {
+                                	System.out.println("SBSB adding cookie " + kv[0].trim() + "=" + kv[1]); // TODO
+                    				cookieList.add(new HttpCookie(kv[0].trim(), kv[1]));
+                    			} else {
+                                	System.out.println("SBSB NOT adding AWS cookie " + kv[0] + "=" + kv[1]); // TODO                   				
+                    				//cookieList.add(new HttpCookie(kv[0].trim(), kv[1]));
+                    			}
+                    		} else {
+                            	System.out.println("SBSB ignoring cookie1 " + cookie); // TODO                   				
+                    		}
+                    	}
+                    	message.getRequestHeader().setCookies(cookieList);
+                    } else {
+                    	message.getRequestHeader().setHeader(header.first, header.second);
+                    }
                 }
                 Context context = Model.getSingleton().getSession().getContext(contextId);
                 AuthenticationMethod am = context.getAuthenticationMethod();
@@ -212,6 +249,27 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
                     } catch (Exception e) {
                         LOGGER.error(e.getMessage(), e);
                     }
+                    /*
+                } else if (am instanceof ClientScriptBasedAuthenticationMethod csbam) {
+                	ClientScriptBasedAuthenticationMethod bbam = (ClientScriptBasedAuthenticationMethod) am;
+                    try {
+                        Method method =
+                                LegacyUtils.class.getMethod(
+                                        "updateHttpState",
+                                        HttpState.class,
+                                        Class.forName(
+                                                "org.apache.hc.client5.http.cookie.CookieStore"));
+
+                        method.invoke(
+                                null,
+                                session.getHttpState(),
+                                ((ClientScriptBasedAuthenticationMethod) bbam.getType())
+                                        .getCookieStore());
+                    } catch (Exception e) {
+                        LOGGER.error(e.getMessage(), e);
+                    }
+                    */
+                	
                 } else if (context.getAuthenticationMethod() == null) {
                     LOGGER.debug("processMessageToMatchSession no auth type set");
                 } else {
@@ -260,11 +318,16 @@ public class HeaderBasedSessionManagementMethodType extends SessionManagementMet
         }
 
         public HttpHeaderBasedSession(List<Pair<String, String>> headers) {
-            super("HTTP Header Based Session " + generatedNameIndex++, new HttpState());
+            super("HTTP Header Based Session " + generatedNameIndex++, new HttpState()); // TODO
             this.headers = headers;
         }
 
-        public List<Pair<String, String>> getHeaders() {
+        public HttpHeaderBasedSession(List<Pair<String, String>> headers, HttpState httpState) {
+            super("HTTP Header Based Session " + generatedNameIndex++, httpState);
+            this.headers = headers;
+		}
+
+		public List<Pair<String, String>> getHeaders() {
             return headers;
         }
     }

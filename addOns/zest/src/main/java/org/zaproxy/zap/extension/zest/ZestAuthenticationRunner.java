@@ -23,7 +23,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+
 import javax.script.ScriptException;
+
 import org.apache.commons.httpclient.URI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -32,6 +34,7 @@ import org.parosproxy.paros.network.HttpMessage;
 import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.addon.network.server.HttpMessageHandler;
 import org.zaproxy.addon.network.server.HttpMessageHandlerContext;
+import org.zaproxy.addon.network.server.HttpServerConfig;
 import org.zaproxy.addon.network.server.Server;
 import org.zaproxy.zap.authentication.AuthenticationHelper;
 import org.zaproxy.zap.authentication.GenericAuthenticationCredentials;
@@ -111,6 +114,7 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
             GenericAuthenticationCredentials credentials)
             throws ScriptException {
 
+    	System.out.println("SBSB ZestAuthRunner start"); // TODO
         this.helper = helper;
 
         Server proxyServer = null;
@@ -118,17 +122,31 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
             if (hasClientStatements()) {
                 proxyServer =
                         getExtensionNetwork()
+                        .createHttpServer(
+                        		HttpServerConfig.builder()
+                        		.setHttpSender(helper.getHttpSender())
+                        		.setHttpMessageHandler(new ZestMessageHandler(this, helper, handler))
+                        		.setServeZapApi(true)
+                        		.build());                		
+                		/*
+                        getExtensionNetwork()
                                 .createHttpProxy(
                                         helper.getHttpSender(),
                                         new ZestMessageHandler(this, helper, handler));
+                                        */
                 int port = proxyServer.start(PROXY_ADDRESS, Server.ANY_PORT);
                 this.setProxy(PROXY_ADDRESS, port);
+            	System.out.println("SBSB ZestAuthRunner setting proxy " + port); // TODO
             }
 
             paramsValues.put(USERNAME, credentials.getParam(USERNAME));
             paramsValues.put(PASSWORD, credentials.getParam(PASSWORD));
 
+        	System.out.println("SBSB ZestAuthRunner running script"); // TODO
             this.run(script.getZestScript(), paramsValues);
+        	System.out.println("SBSB ZestAuthRunner finished script"); // TODO
+        	Thread.sleep(5000);
+        	System.out.println("SBSB ZestAuthRunner finished sleep"); // TODO
 
             String respUrl = this.getVariable(ZestVariables.RESPONSE_URL);
             HttpMessage msg = new HttpMessage(new URI(respUrl, true));
@@ -150,15 +168,18 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
             return msg;
 
         } catch (Exception e) {
+        	e.printStackTrace(); // TODO Doesnt look like its hitting this case
             throw new ScriptException(e);
         } finally {
             if (proxyServer != null) {
                 try {
+                	System.out.println("SBSB ZestAuthRunner closing proxy"); // TODO
                     proxyServer.close();
                 } catch (IOException e) {
                     LOGGER.debug("An error occurred while stopping the proxy.", e);
                 }
             }
+        	System.out.println("SBSB ZestAuthRunner end"); // TODO
         }
     }
 

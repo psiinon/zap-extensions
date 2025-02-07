@@ -50,6 +50,10 @@ public final class ClientSideHandler implements HttpMessageHandler {
     public ClientSideHandler(Context context) {
         this.context = context;
     }
+    
+    private boolean isPost(HttpMessage msg) {
+        return HttpRequestHeader.POST.equals(msg.getRequestHeader().getMethod());
+    }
 
     @Override
     public void handleMessage(HttpMessageHandlerContext ctx, HttpMessage msg) {
@@ -59,23 +63,33 @@ public final class ClientSideHandler implements HttpMessageHandler {
         }
 
         AuthenticationHelper.addAuthMessageToHistory(msg);
-
-        if (HttpRequestHeader.POST.equals(msg.getRequestHeader().getMethod())
+        
+        if (isPost(msg)
                 && context.isIncluded(msg.getRequestHeader().getURI().toString())) {
             // Record the last in scope POST as a fallback
             fallbackMsg = msg;
+        }
+        
+        if (authMsg != null && isPost(authMsg) && ! isPost(msg)) {
+        	// We have a better candidate
+        	return;
         }
 
         SessionManagementRequestDetails smReqDetails = null;
         Map<String, SessionToken> sessionTokens = AuthUtils.getResponseSessionTokens(msg);
         if (!sessionTokens.isEmpty()) {
             authMsg = msg;
+            LOGGER.info(
+                    "SBSB Better Session token found in href {} {}", // TODO
+                    authMsg.getHistoryRef().getHistoryId(), isPost(msg));
             smReqDetails =
                     new SessionManagementRequestDetails(
                             authMsg,
                             new ArrayList<>(sessionTokens.values()),
                             Alert.CONFIDENCE_HIGH);
         } else {
+        	// TODO first check response for any expected session tokens
+        	
             Set<SessionToken> reqSessionTokens = AuthUtils.getRequestSessionTokens(msg);
             if (!reqSessionTokens.isEmpty()) {
                 // The request has at least one auth token we missed - try
@@ -83,6 +97,7 @@ public final class ClientSideHandler implements HttpMessageHandler {
                 for (SessionToken st : reqSessionTokens) {
                     smReqDetails = AuthUtils.findSessionTokenSource(st.getValue(), firstHrefId);
                     if (smReqDetails != null) {
+                    	// TODO this is too simplistic
                         authMsg = smReqDetails.getMsg();
                         LOGGER.debug(
                                 "Session token found in href {}",

@@ -137,6 +137,7 @@ public class RFC6265CookieSpec implements CookieSpec {
             cursor.updatePos(cursor.getPos() + 1);
         }
         final BasicClientCookie cookie = new BasicClientCookie(name, value);
+    	System.out.println("SBSB RFC6265CookieSpec.parse " + name + "=" + value);
         cookie.setPath(getDefaultPath(origin));
         cookie.setDomain(getDefaultDomain(origin));
         cookie.setCreationDate(Instant.now());

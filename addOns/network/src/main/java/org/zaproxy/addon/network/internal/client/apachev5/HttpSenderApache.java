@@ -413,6 +413,15 @@ public class HttpSenderApache
         }
         User user = ctx.getUser(message);
         if (user != null) {
+            // TODO
+        	if (message.getRequestHeader().getURI().toString().contains("my-account")) {
+        		System.out.println("SBSB sendImpl0 url " + message.getRequestHeader().getURI().toString() + 
+        				" user " + Objects.hashCode(user) + " authSession " + user.getAuthenticatedSession());
+        		if (user.getAuthenticatedSession() != null) {
+        			System.out.println("SBSB sendImpl0 state " + user.getAuthenticatedSession().getHttpState().toString());
+        		}
+        	}
+        	
             requestConfigBuilder.setCookieSpec(StandardCookieSpec.RELAXED);
             requestCtx.setCookieStore(
                     LegacyUtils.httpStateToCookieStore(user.getCorrespondingHttpState()));

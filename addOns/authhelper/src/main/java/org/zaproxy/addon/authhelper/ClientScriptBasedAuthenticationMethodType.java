@@ -26,17 +26,23 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
+
 import javax.swing.DefaultComboBoxModel;
 import javax.swing.JButton;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.lang3.exception.ExceptionUtils;
+import org.apache.commons.lang3.reflect.FieldUtils;
+import org.apache.commons.lang3.reflect.MethodUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jdesktop.swingx.JXComboBox;
@@ -45,8 +51,10 @@ import org.jdesktop.swingx.renderer.DefaultListRenderer;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.network.HttpMessage;
+import org.parosproxy.paros.network.HttpSender;
 import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.authhelper.internal.ClientSideHandler;
+import org.zaproxy.addon.network.internal.client.apachev5.HttpSenderContextApache;
 import org.zaproxy.addon.network.server.HttpMessageHandler;
 import org.zaproxy.zap.authentication.AbstractAuthenticationMethodOptionsPanel;
 import org.zaproxy.zap.authentication.AuthenticationCredentials;
@@ -67,7 +75,11 @@ import org.zaproxy.zap.utils.EncodingUtils;
 import org.zaproxy.zap.utils.ZapHtmlLabel;
 import org.zaproxy.zap.view.DynamicFieldsPanel;
 import org.zaproxy.zap.view.LayoutHelper;
+import org.zaproxy.zest.core.v1.ZestClientLaunch;
+import org.zaproxy.zest.core.v1.ZestClientWindowClose;
+import org.zaproxy.zest.core.v1.ZestClientWindowHandle;
 import org.zaproxy.zest.core.v1.ZestScript;
+import org.zaproxy.zest.core.v1.ZestStatement;
 
 public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthenticationMethodType {
 
@@ -258,6 +270,27 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
                     authScript.getClass().getCanonicalName());
             return null;
         }
+        
+        private Set<String> getClientClosedWindowHandles(ZestScript zestScript) {
+            Set<String> ids = new HashSet<>();
+            zestScript.getStatements().forEach(s -> {
+            	if (s instanceof ZestClientWindowClose closeStmt) {
+            		ids.add(closeStmt.getWindowHandle());
+            	}
+            });
+            return ids;
+
+        }
+        
+        protected void appendCloseStatements (ZestScript zestScript) {
+        	ZestStatement last = zestScript.getLast();
+        	if (!(last instanceof ZestClientWindowClose)) {
+        		// Potentially need to add at least one close statement
+        		Set<String> handles = zestScript.getClientWindowHandles();
+        		handles.removeAll(this.getClientClosedWindowHandles(zestScript));
+        		handles.forEach(h -> zestScript.add(new ZestClientWindowClose(h, 1)));
+        	}
+        }
 
         @Override
         public WebSession authenticate(
@@ -295,15 +328,19 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
                     setLoggedOutIndicatorPattern(scriptV2.getLoggedOutIndicator());
                 }
 
-                if (authScript instanceof ZestAuthenticationRunner zestScript) {
-                    zestScript.registerHandler(getHandler(user.getContext()));
+                if (authScript instanceof ZestAuthenticationRunner zestRunner) {
+                	zestRunner.registerHandler(getHandler(user.getContext()));
+                    appendCloseStatements(zestRunner.getScript().getZestScript());
                 } else {
                     LOGGER.warn("Expected authScript to be a Zest script");
                     return null;
                 }
+                
+                HttpSender sender = getHttpSender();
+                sender.setUser(user);
 
                 authScript.authenticate(
-                        new AuthenticationHelper(getHttpSender(), sessionManagementMethod, user),
+                        new AuthenticationHelper(sender, sessionManagementMethod, user),
                         this.paramValues,
                         cred);
             } catch (Exception e) {
@@ -331,8 +368,10 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
 
             HttpMessage authMsg = handler.getAuthMsg();
             if (authMsg != null) {
+            	System.out.println("SBSB Found auth msg? " + authMsg.getHistoryRef()); // TODO
                 // Update the session as it may have changed
                 WebSession session = sessionManagementMethod.extractWebSession(authMsg);
+                // TODO next line is when we loose the state, was fine until here
                 user.setAuthenticatedSession(session);
 
                 if (this.isAuthenticated(authMsg, user, true)) {
@@ -347,6 +386,7 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
             }
 
             // We don't expect this to work, but it will prevent some NPEs
+        	System.out.println("SBSB NOT found auth msg? " + handler.getFallbackMsg()); // TODO
             return sessionManagementMethod.extractWebSession(handler.getFallbackMsg());
         }
 
@@ -360,14 +400,54 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
     private static Map<String, String> wrapKeys(Map<String, String> kvPairs) {
         Map<String, String> map = new HashMap<>();
         for (Entry<String, String> kv : kvPairs.entrySet()) {
+        	String val = kv.getValue();
+        	if (val == null) {
+        		val = "";
+        	}
+        	System.out.println("SBSB " + AuthenticationMethod.TOKEN_PREFIX
+                            + kv.getKey()
+                            + AuthenticationMethod.TOKEN_POSTFIX + " = " +
+                            val); // TODO
             map.put(
                     AuthenticationMethod.TOKEN_PREFIX
                             + kv.getKey()
                             + AuthenticationMethod.TOKEN_POSTFIX,
-                    kv.getValue());
+                    val);
         }
         return map;
     }
+    
+    // TODO
+    private HttpSender httpSender;
+    private synchronized HttpSender getHttpSender() {
+        if (httpSender == null) {
+            httpSender = new HttpSender(HttpSender.AUTHENTICATION_HELPER_INITIATOR);
+            httpSender.setUseGlobalState(false);
+        }
+        return httpSender;
+    }
+
+    public Object getCookieStore() {
+        try {
+            HttpSender temp = getHttpSender();
+            Object obj = MethodUtils.invokeMethod(temp, true, "getContext");
+
+            if (obj instanceof HttpSenderContextApache) {
+                return FieldUtils.readField(
+                        HttpSenderContextApache.class.getDeclaredField("localCookieStore"),
+                        (HttpSenderContextApache) obj,
+                        true);
+            }
+        } catch (Exception e) {
+            LOGGER.error(
+                    "Failed get {} private field: {}",
+                    getHttpSender().getClass().getCanonicalName(),
+                    "ctx",
+                    e);
+        }
+        return null;
+    }
+
 
     @SuppressWarnings("serial")
     public class ClientScriptBasedAuthenticationMethodOptionsPanel
