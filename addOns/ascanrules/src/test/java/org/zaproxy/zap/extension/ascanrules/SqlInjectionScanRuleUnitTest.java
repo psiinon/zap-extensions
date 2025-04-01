@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.is;
 import fi.iki.elonen.NanoHTTPD;
 import fi.iki.elonen.NanoHTTPD.IHTTPSession;
 import fi.iki.elonen.NanoHTTPD.Response;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
@@ -54,6 +55,47 @@ import org.zaproxy.zap.testutils.UrlParamValueHandler;
 
 /** Unit test for {@link SqlInjectionScanRule}. */
 class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRule> {
+
+    static final String[] ALL_SQL_ERRORS = {
+        "You have an error in your SQL syntax",
+        "com.mysql.jdbc.exceptions",
+        "org.gjt.mm.mysql",
+        "ODBC driver does not support",
+        "The used SELECT statements have a different number of columns",
+        "You have an error in your SQL syntax",
+        "The used SELECT statements have a different number of columns",
+        "com.microsoft.sqlserver.jdbc",
+        "com.microsoft.jdbc",
+        "com.inet.tds",
+        "com.microsoft.sqlserver.jdbc",
+        "com.ashna.jturbo",
+        "weblogic.jdbc.mssqlserver",
+        "[Microsoft]",
+        "[SQLServer]",
+        "[SQLServer 2000 Driver for JDBC]",
+        "net.sourceforge.jtds.jdbc",
+        "80040e14",
+        "800a0bcd",
+        "80040e57",
+        "ODBC driver does not support",
+        "All queries in an SQL statement containing a UNION operator must have an equal number of expressions in their target lists",
+        "All queries combined using a UNION, INTERSECT or EXCEPT operator must have an equal number of expressions in their target lists",
+        "oracle.jdbc",
+        "SQLSTATE[HY",
+        "ORA-00933",
+        "ORA-06512",
+        "SQL command not properly ended",
+        "ORA-00942",
+        "ORA-29257",
+        "ORA-00932",
+        "query block has incorrect number of result columns",
+        "ORA-01789",
+        "org.postgresql.util.PSQLException",
+        "org.postgresql",
+        "each UNION query must have the same number of columns",
+        "com.sybase.jdbc",
+        "net.sourceforge.jtds.jdbc",
+    };
 
     @Override
     protected int getRecommendMaxNumberMessagesPerParam(AttackStrength strength) {
@@ -703,8 +745,14 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
 
     @Nested
     class ErrorBasedSqlInjection {
-        @Test
-        void shouldAlertEmptyPrefix() throws Exception {
+
+        static List<String> allSqlErrors() {
+            return Arrays.asList(ALL_SQL_ERRORS);
+        }
+
+        @ParameterizedTest
+        @MethodSource("allSqlErrors")
+        void shouldAlertEmptyPrefix(String error) throws Exception {
             // Given
             String param = "param";
             String normalValue = "test";
@@ -716,7 +764,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
                             .whenParamValueIs(param)
                             .thenReturnHtml(normalValue)
                             .whenParamValueIs(emptyPrefixErrorValue)
-                            .thenReturnHtml("You have an error in your SQL syntax")
+                            .thenReturnHtml(error)
                             .build();
             nano.addHandler(handler);
             rule.init(getHttpMessage("/?param=" + normalValue), parent);
@@ -726,10 +774,12 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
 
             // Then
             assertThat(alertsRaised, hasSize(1));
+            assertThat(alertsRaised.get(0).getEvidence(), equalTo(error));
         }
 
-        @Test
-        void shouldAlertOriginalParamPrefix() throws Exception {
+        @ParameterizedTest
+        @MethodSource("allSqlErrors")
+        void shouldAlertOriginalParamPrefix(String error) throws Exception {
             // Given
             String param = "param";
             String normalValue = "test";
@@ -741,7 +791,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
                             .whenParamValueIs(param)
                             .thenReturnHtml(normalValue)
                             .whenParamValueIs(originalParamErrorValue)
-                            .thenReturnHtml("You have an error in your SQL syntax")
+                            .thenReturnHtml(error)
                             .build();
             nano.addHandler(handler);
             rule.init(getHttpMessage("/?param=" + normalValue), parent);
@@ -751,6 +801,7 @@ class SqlInjectionScanRuleUnitTest extends ActiveScannerTest<SqlInjectionScanRul
 
             // Then
             assertThat(alertsRaised, hasSize(1));
+            assertThat(alertsRaised.get(0).getEvidence(), equalTo(error));
         }
 
         @Test

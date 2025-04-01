@@ -249,8 +249,6 @@ public class SqlInjectionScanRule extends AbstractAppParamPlugin
                 "Sybase",
                 Tech.Sybase,
                 "\\Qcom.sybase.jdbc\\E",
-                "\\Qcom.sybase.jdbc2.jdbc\\E",
-                "\\Qcom.sybase.jdbc3.jdbc\\E",
                 "\\Qnet.sourceforge.jtds.jdbc\\E" // see also Microsoft SQL Server. could be either!
                 ),
 
