@@ -160,9 +160,13 @@ public class ZestZapRunner extends ZestBasicRunner implements ScannerListener {
         } else {
             this.target = null;
             if (wrapper.getWriter() != null) {
+                System.out.println("SBSB setWriter to wrapper 1"); // TODO
                 super.setOutputWriter(wrapper.getWriter());
             } else if (scriptUI != null && !hasOutputWriter()) {
+                System.out.println("SBSB setWriter to UI 1"); // TODO
                 super.setOutputWriter(scriptUI.getOutputWriter());
+            } else {
+                System.out.println("SBSB not setWriter 1"); // TODO
             }
             this.setDebug(this.wrapper.isDebug());
 
@@ -192,9 +196,13 @@ public class ZestZapRunner extends ZestBasicRunner implements ScannerListener {
                     ZestClientFailException {
         LOGGER.debug("Run script {}", script.getTitle());
         if (wrapper.getWriter() != null) {
+            System.out.println("SBSB setWriter to wrapper 2"); // TODO
             super.setOutputWriter(wrapper.getWriter());
         } else if (scriptUI != null && !hasOutputWriter()) {
+            System.out.println("SBSB setWriter to UI 2"); // TODO
             super.setOutputWriter(scriptUI.getOutputWriter());
+        } else {
+            System.out.println("SBSB not setWriter 2"); // TODO
         }
         this.setDebug(this.wrapper.isDebug());
         String result = super.run(script, target, params);
@@ -386,6 +394,7 @@ public class ZestZapRunner extends ZestBasicRunner implements ScannerListener {
             this.notifyResponse(zrw);
 
         } catch (Exception e) {
+            // TODO - cant catch ZestAssertFailException ?
             LOGGER.error(e.getMessage(), e);
         }
     }
@@ -401,9 +410,19 @@ public class ZestZapRunner extends ZestBasicRunner implements ScannerListener {
                 }
             }
             return super.handleClient(script, client);
+        } catch (ZestClientFailException e) {
+            System.out.println("SBSB ZestClientFailException"); // TODO failing here
+            e.printStackTrace();
+            throw e;
         } catch (Exception e) {
+            // TODO - this is a good fix!
+            System.out.println("SBSB Non ZestClientFailException"); // TODO
+            e.printStackTrace();
+            throw new ZestClientFailException(client, e.getMessage(), e);
+            /*
             LOGGER.error(e.getMessage(), e);
             return null;
+            */
         }
     }
 

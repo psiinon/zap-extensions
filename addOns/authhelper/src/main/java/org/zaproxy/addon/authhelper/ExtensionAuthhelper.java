@@ -21,12 +21,18 @@ package org.zaproxy.addon.authhelper;
 
 import com.bastiaanjansen.otp.HMACAlgorithm;
 import com.bastiaanjansen.otp.TOTPGenerator;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.json.JsonMapper;
 import java.awt.EventQueue;
 import java.awt.event.KeyEvent;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,6 +45,7 @@ import org.apache.commons.text.StringEscapeUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
+import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.control.Control.Mode;
 import org.parosproxy.paros.db.Database;
 import org.parosproxy.paros.db.DatabaseException;
@@ -47,7 +54,9 @@ import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
 import org.parosproxy.paros.extension.SessionChangedListener;
+import org.parosproxy.paros.extension.history.ExtensionHistory;
 import org.parosproxy.paros.model.HistoryReference;
+import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.view.View;
@@ -394,6 +403,67 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
 
         } catch (Exception e) {
             LOGGER.warn(e.getMessage(), e);
+        }
+    }
+
+    private static final String REPORT_PATH =
+            "/Users/simon/Documents/Checkmarx/customers/papaya/papaya.auth.json";
+    private static final String OUTPUT_DIR =
+            "/Users/simon/Documents/Checkmarx/customers/papaya/images/";
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public void postInit() {
+        try {
+            Map<String, Object> report =
+                    JsonMapper.builder()
+                            .build()
+                            .readValue(
+                                    Paths.get(REPORT_PATH).toFile(),
+                                    new TypeReference<Map<String, Object>>() {});
+            Map<String, Object> diagnostics =
+                    ((List<Map<String, Object>>) report.get("diagnostics")).get(0);
+
+            Path baseDir = Paths.get(OUTPUT_DIR);
+            List<Map<String, Object>> steps = (List<Map<String, Object>>) diagnostics.get("steps");
+            for (int i = 0; i < steps.size(); i++) {
+                Map<String, Object> step = steps.get(i);
+                String screenshotData = (String) step.get("screenshot");
+                if (screenshotData != null) {
+                    Files.write(
+                            baseDir.resolve("image" + i + ".png"),
+                            Base64.getDecoder().decode(screenshotData));
+                }
+                List<Map<String, Object>> messages =
+                        (List<Map<String, Object>>) step.get("messages");
+                if (messages != null) {
+                    for (int j = 0; j < messages.size(); j++) {
+                        Map<String, Object> messageData = messages.get(j);
+                        HttpMessage message = new HttpMessage();
+                        message.setRequestHeader((String) messageData.get("requestHeader"));
+                        message.setRequestBody((String) messageData.get("requestBody"));
+
+                        message.setResponseHeader((String) messageData.get("responseHeader"));
+                        message.setResponseBody((String) messageData.get("responseBody"));
+
+                        final ExtensionHistory extHistory =
+                                Control.getSingleton()
+                                        .getExtensionLoader()
+                                        .getExtension(ExtensionHistory.class);
+                        final HistoryReference ref =
+                                new HistoryReference(
+                                        Model.getSingleton().getSession(),
+                                        HistoryReference.TYPE_AUTHENTICATION,
+                                        message);
+                        ref.addTag("Step: " + (i + 1) + " Mesage: " + (j + 1));
+                        if (extHistory != null) {
+                            EventQueue.invokeLater(() -> extHistory.addHistory(ref));
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }

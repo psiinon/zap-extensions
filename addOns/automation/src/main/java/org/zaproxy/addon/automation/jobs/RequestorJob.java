@@ -221,8 +221,13 @@ public class RequestorJob extends AutomationJob {
                                     this.getName(),
                                     msg.getRequestHeader().getURI()));
                 }
+                System.out.println(
+                        "SBSB AF Req pre send to " + msg.getRequestHeader().getURI()); // TODO
                 httpSender.sendAndReceive(msg);
+                System.out.println(
+                        "SBSB AF Req post send to " + msg.getRequestHeader().getURI()); // TODO
             } catch (Exception e) {
+                System.out.println("SBSB AF Req exception " + e.getMessage()); // TODO
                 progress.warn(
                         Constant.messages.getString(
                                 "automation.error.requestor.badnetwork", this.getName(), name, e));

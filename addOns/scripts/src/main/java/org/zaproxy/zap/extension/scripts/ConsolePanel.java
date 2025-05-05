@@ -699,6 +699,7 @@ public class ConsolePanel extends AbstractPanel {
      * @see ScriptWrapper#isRunnableStandalone()
      */
     private void updateRunButtonStates() {
+        System.out.println("SBSB updateRunButtonStates"); // TODO
         // The only type that can be run directly from the console
         if (script == null || !script.isRunnableStandalone()) {
             setButtonsAllowRunScript(false);
@@ -715,8 +716,10 @@ public class ConsolePanel extends AbstractPanel {
         ScriptExecutorThread thread = refScriptExecutorThread.get();
         refScriptExecutorThread.clear();
         if (thread != null && thread.isAlive()) {
+            System.out.println("SBSB updateRunButtonStates thread is alive"); // TODO
             updateButtonsStateScriptRunning();
         } else {
+            System.out.println("SBSB updateRunButtonStates thread is dead"); // TODO
             runnableScriptsToThreadMap.remove(script);
             setButtonsAllowRunScript(true);
         }
@@ -779,7 +782,11 @@ public class ConsolePanel extends AbstractPanel {
             try {
                 extension.getExtScript().invokeScript(script);
             } catch (Exception e) {
+                System.out.println("SBSB Scripts Console error " + e.getMessage()); // TODO
                 if (extension.getView() != null) {
+                    System.out.println(
+                            "SBSB Scripts Console writing error to console "
+                                    + e.getMessage()); // TODO
                     extension
                             .getView()
                             .getOutputPanel()
