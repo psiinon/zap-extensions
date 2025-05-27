@@ -219,8 +219,18 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
         public int getLoginPageWait() {
             return loginPageWait;
         }
+        
+        // TODO
+        private ScriptWrapper scriptWrapper;
+        
+        public void setScriptWrapper(ScriptWrapper wrapper) {
+        	this.scriptWrapper = wrapper;
+        }
 
         protected ScriptWrapper getScriptTemp() {
+        	if (scriptWrapper != null) {
+        		return scriptWrapper;
+        	}
             try {
                 return (ScriptWrapper) scriptField.get(this);
             } catch (Exception ignore) {
@@ -357,6 +367,7 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
                 AuthenticationCredentials credentials,
                 User user)
                 throws UnsupportedAuthenticationCredentialsException {
+        	System.out.println("SBSB authenticate start"); // TODO
             if (!(credentials instanceof GenericAuthenticationCredentials)) {
                 user.getAuthenticationState()
                         .setLastAuthFailure("Credentials not GenericAuthenticationCredentials");
@@ -371,6 +382,7 @@ public class ClientScriptBasedAuthenticationMethodType extends ScriptBasedAuthen
             ScriptWrapper script = getScriptTemp();
             AuthenticationScript authScript = getAuthenticationScriptTemp();
             if (authScript == null) {
+            	System.out.println("SBSB authenticate null authScript"); // TODO
                 return null;
             }
             LOGGER.debug("Script class: {}", authScript.getClass().getCanonicalName());
