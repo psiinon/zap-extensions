@@ -41,6 +41,7 @@ import org.parosproxy.paros.network.HttpHeader;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpRequestHeader;
 import org.zaproxy.addon.authhelper.AuthenticationRequestDetails.AuthDataType;
+import org.zaproxy.addon.commonlib.AuthConstants;
 import org.zaproxy.zap.extension.anticsrf.AntiCsrfToken;
 import org.zaproxy.zap.extension.anticsrf.ExtensionAntiCSRF;
 import org.zaproxy.zap.extension.pscan.PluginPassiveScanner;
@@ -75,22 +76,6 @@ public class AuthenticationDetectionScanRule extends PluginPassiveScanner {
      */
     private static final List<String> PASSWORD_ELEMENTS = List.of("pass", "pwd");
 
-    /**
-     * A list of commonly used string in authentication request URLs. A URL containing any of these
-     * strings as well as a recognised user and password parameter will be treated as a high
-     * confidence match.
-     */
-    private static final List<String> AUTH_URL_SEGMENTS =
-            List.of("login", "signin", "sign-in", "inloggen", "accueil");
-
-    /**
-     * A list of commonly used string in register request URLs. A URL containing any of these
-     * strings NOT be counted as an authentication request even if there are recognised user and
-     * password parameters.
-     */
-    private static final List<String> REGISTER_URL_SEGMENTS =
-            List.of("register", "signup", "sign-up");
-
     @Override
     public int getPluginId() {
         return 10111;
@@ -103,6 +88,9 @@ public class AuthenticationDetectionScanRule extends PluginPassiveScanner {
 
     @Override
     public void scanHttpResponseReceive(HttpMessage msg, int id, Source source) {
+        if (!AuthUtils.isRelevantToAuth(msg)) {
+            return;
+        }
         TreeSet<HtmlParameter> params;
         AuthenticationRequestDetails.AuthDataType type =
                 AuthenticationRequestDetails.AuthDataType.FORM;
@@ -135,7 +123,7 @@ public class AuthenticationDetectionScanRule extends PluginPassiveScanner {
         if (userParam != null && passwordParam != null) {
             String urlLc = msg.getRequestHeader().getURI().toString().toLowerCase(Locale.ROOT);
 
-            if (REGISTER_URL_SEGMENTS.stream().anyMatch(urlLc::contains)) {
+            if (AuthConstants.getRegistrationIndicators().stream().anyMatch(urlLc::contains)) {
                 // It looks like a registration request
                 LOGGER.debug("Assumed register request: {} ", msg.getRequestHeader().getURI());
                 Stats.incCounter("stats.auth.detect.register");
@@ -151,7 +139,8 @@ public class AuthenticationDetectionScanRule extends PluginPassiveScanner {
                                 type,
                                 msg.getRequestHeader().getHeader(HttpHeader.REFERER),
                                 getAntiCsrfTokens(msg),
-                                AUTH_URL_SEGMENTS.stream().anyMatch(urlLc::contains)
+                                AuthConstants.getLoginIndicators().stream()
+                                                .anyMatch(urlLc::contains)
                                         ? Alert.CONFIDENCE_HIGH
                                         : Alert.CONFIDENCE_LOW);
 

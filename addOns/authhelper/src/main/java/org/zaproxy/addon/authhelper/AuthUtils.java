@@ -32,6 +32,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -46,6 +47,7 @@ import net.htmlparser.jericho.Source;
 import net.sf.json.JSONArray;
 import net.sf.json.JSONException;
 import net.sf.json.JSONObject;
+import net.sf.json.util.JSONUtils;
 import org.apache.commons.httpclient.URI;
 import org.apache.commons.httpclient.URIException;
 import org.apache.commons.lang3.StringUtils;
@@ -153,6 +155,7 @@ public class AuthUtils {
                                 }
                             })
                     .build();
+
     static final int MAX_UNAUTH_REDIRECTIONS = 50;
 
     private static AuthenticationBrowserHook browserHook;
@@ -320,11 +323,7 @@ public class AuthUtils {
     }
 
     private static String getAttribute(WebElement element, String name) {
-        String value = element.getDomAttribute(name);
-        if (value != null) {
-            return value;
-        }
-        return element.getDomProperty(name);
+        return element.getAttribute(name);
     }
 
     private static Stream<WebElement> displayed(List<WebElement> elements) {
@@ -761,7 +760,9 @@ public class AuthUtils {
         }
 
         String responseData = msg.getResponseBody().toString();
-        if (msg.getResponseHeader().isJson() && StringUtils.isNotBlank(responseData)) {
+        if (msg.getResponseHeader().isJson()
+                && StringUtils.isNotBlank(responseData)
+                && !extractJsonString(map, responseData)) {
             Map<String, SessionToken> tokens = new HashMap<>();
             try {
                 try {
@@ -798,10 +799,21 @@ public class AuthUtils {
         return map;
     }
 
+    private static boolean extractJsonString(Map<String, SessionToken> map, String response) {
+        if (response.startsWith("\"") && JSONUtils.isString(response)) {
+            addToMap(
+                    map,
+                    new SessionToken(
+                            SessionToken.JSON_SOURCE, "", JSONUtils.stripQuotes(response)));
+            return true;
+        }
+        return false;
+    }
+
     public static List<Pair<String, String>> getHeaderTokens(
             HttpMessage msg, List<SessionToken> tokens, boolean incCookies) {
         List<Pair<String, String>> list = new ArrayList<>();
-        for (SessionToken token : tokens) {
+        for (SessionToken token : new TreeSet<>(tokens)) {
             for (HttpHeaderField header : msg.getRequestHeader().getHeaders()) {
                 if (HttpHeader.COOKIE.equalsIgnoreCase(header.getName())) {
                     // Handle cookies below so we can separate them out
@@ -844,7 +856,9 @@ public class AuthUtils {
     public static Map<String, SessionToken> getAllTokens(HttpMessage msg, boolean incReqCookies) {
         Map<String, SessionToken> tokens = new HashMap<>();
         String responseData = msg.getResponseBody().toString();
-        if (msg.getResponseHeader().isJson() && StringUtils.isNotBlank(responseData)) {
+        if (msg.getResponseHeader().isJson()
+                && StringUtils.isNotBlank(responseData)
+                && !extractJsonString(tokens, responseData)) {
             // Extract json response data
             try {
                 try {

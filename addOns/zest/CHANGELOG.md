@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 
+## [48.7.0] - 2025-06-10
+### Changed
+- Update Zest library to 0.30.0:
+  - Update Selenium to version 4.33.0.
+  - Send RETURN key if submit fails for input elements not in a form.
+
 ## [48.6.0] - 2025-05-20
 ### Added
 - Client element waitForMsec parameter.
@@ -406,6 +412,7 @@ Sender scripts. (Issue 5590)
 
 - Updated for 2.1.0
 
+[48.7.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.7.0
 [48.6.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.6.0
 [48.5.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.5.0
 [48.4.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.4.0

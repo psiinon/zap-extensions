@@ -28,6 +28,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Wait for the detection of the session method in Client Script Based Authentication method.
 - Include the name of the interaction in the Client Script Based Authentication diagnostics.
 - Clear fields before sending keys for Browser Based Authentication, including when using steps.
+- Do not add an empty line to the start of the Other Info of Session Management Response Identified scan rule's alerts.
+- Update the Client Script Based Authentication help page with the new Automation Framework `scriptInline` field.
+- The Authentication Request Detection and Session Management Detection scan rules now skip resources (images, css, js, etc) which are unlikely to be relevant.
+- The Verification Detection scan rule now skips messages that seem related to login/logout/registration functionality.
+- Now depends on minimum Common Library version 1.33.0.
 
 ### Fixed
 - Correct descriptions of the Zest script steps in the Authentication Report.
@@ -40,6 +45,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Correct the processing of cookies with the same name in Header Based Session Management method.
 - Correct redirection handling when checking verification URLs.
 - Verification URL comparison.
+- Use the session token from JSON string response.
+- Do not auto configure the Header Based Session Management method with duplicated session tokens.
+- Ensure that auth messages with both known and unknown Session tokens are correctly processed.
+- Respect Client Script Based Authentication's Login Page Wait when authenticating in browsers (e.g. AJAX Spider).
 
 ## [0.25.0] - 2025-03-25
 ### Changed
