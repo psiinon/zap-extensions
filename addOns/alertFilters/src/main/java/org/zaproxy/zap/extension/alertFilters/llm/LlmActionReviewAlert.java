@@ -78,6 +78,18 @@ public class LlmActionReviewAlert {
             ---
             """;
 
+    private static final String ALERT_REVIEW_EVIDENCE =
+            """
+            As evidence, the HTTP message contains:
+            ---
+            {{evidence}}
+            ---
+            """;
+    private static final String ALERT_REVIEW_NO_EVIDENCE =
+            """
+            There is no evidence in the alert, which is usual for missing security controls.
+            ---
+            """;
     private static final String ALERT_REVIEW_OTHER_INFO =
             """
             As alert other info contains:
@@ -144,8 +156,8 @@ public class LlmActionReviewAlert {
                         "ALERT_REVIEW",
                         Constant.messages.getString("alertFilters.llm.reviewalert.output.tab"));
 
-        ChatResponse resp = commsService.chat(chatRequest);
         commsService.switchToOutputTab();
+        ChatResponse resp = commsService.chat(chatRequest);
         AlertFeedback feedback = LlmCommunicationService.mapResponse(resp, AlertFeedback.class);
 
         if (feedback.level() == alert.getConfidence()) {
