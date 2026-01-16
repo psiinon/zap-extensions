@@ -191,8 +191,7 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
             View.getSingleton()
                     .showWarningDialog(
                             this,
-                            Constant.messages.getString(
-                                    "llm.options.providers.error.name.empty"));
+                            Constant.messages.getString("llm.options.providers.error.name.empty"));
             return false;
         }
 

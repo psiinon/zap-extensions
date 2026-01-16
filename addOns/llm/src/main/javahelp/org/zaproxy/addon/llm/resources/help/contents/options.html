@@ -13,6 +13,7 @@
         Configure one or more model providers. Each provider entry has a unique name, which is used
         to select it in other parts of the UI. You can add, modify, and remove providers from the
         list. The default provider is used when an LLM is required and no other provider is chosen.
+        You can also set the default model for the selected provider.
     </p>
     <p>
         The current supported model providers are:
@@ -55,6 +56,29 @@ If you have Ollama installed on the same machine as ZAP then by default the endp
         <li><strong>Endpoint Base URL</strong>: The base URL for API requests (not required for Google Gemini).
         <li><strong>Models</strong>: One or more model/deployment names, one per line.
     </ul>
+</section>
+
+<section>
+    <h2>Defaults</h2>
+    <p>
+        The <strong>Default provider</strong> is used by LLM features unless another provider is
+        selected elsewhere. The default provider list includes a <strong>None</strong> option,
+        which indicates that no provider is configured by default.
+    </p>
+    <p>
+        The <strong>Default model</strong> applies to the selected default provider. It is populated
+        from the provider's model list.
+    </p>
+</section>
+
+<section>
+    <h2>Toolbar Model Selector</h2>
+    <p>
+        The main toolbar includes an LLM button that lets you quickly switch the default provider
+        and model. The dropdown shows one entry for each provider/model combination and indicates
+        which one is currently the default. The <strong>None</strong> entry clears the default
+        provider and model.
+    </p>
 </section>
 
 

@@ -106,67 +106,7 @@ public class LlmOptions extends VersionedAbstractParam {
     }
 
     @Override
-    protected void updateConfigsImpl(int fileVersion) {
-        if (fileVersion < 2) {
-            migrateLegacyConfig();
-        }
-        if (fileVersion < 3) {
-            migrateProviderModels();
-        }
-    }
-
-    private void migrateLegacyConfig() {
-        HierarchicalConfiguration config = (HierarchicalConfiguration) getConfig();
-        if (config.getKeys(ALL_PROVIDERS_KEY).hasNext()) {
-            return;
-        }
-
-        LlmProvider legacyProvider = getEnum(MODEL_PROVIDER_PROPERTY, LlmProvider.NONE);
-        String legacyApiKey = getString(APIKEY_PROPERTY, "");
-        String legacyEndpoint = getString(ENDPOINT_PROPERTY, "");
-        String legacyModelName = getString(MODEL_NAME_PROPERTY, "");
-
-        if (legacyProvider != LlmProvider.NONE
-                || StringUtils.isNotBlank(legacyApiKey)
-                || StringUtils.isNotBlank(legacyEndpoint)
-                || StringUtils.isNotBlank(legacyModelName)) {
-            String elementBaseKey = ALL_PROVIDERS_KEY + "(0).";
-            config.setProperty(elementBaseKey + PROVIDER_NAME_KEY, DEFAULT_PROVIDER_NAME);
-            config.setProperty(elementBaseKey + PROVIDER_TYPE_KEY, legacyProvider.name());
-            config.setProperty(elementBaseKey + PROVIDER_APIKEY_KEY, legacyApiKey);
-            config.setProperty(elementBaseKey + PROVIDER_ENDPOINT_KEY, legacyEndpoint);
-            config.setProperty(elementBaseKey + PROVIDER_MODEL_NAME_KEY, legacyModelName);
-            if (StringUtils.isNotBlank(legacyModelName)) {
-                config.setProperty(elementBaseKey + PROVIDER_MODELS_KEY + "(0)", legacyModelName);
-                config.setProperty(PROVIDERS_BASE_KEY + ".defaultModel", legacyModelName);
-            }
-            config.setProperty(DEFAULT_PROVIDER_PROPERTY, DEFAULT_PROVIDER_NAME);
-        }
-
-        config.clearProperty(MODEL_PROVIDER_PROPERTY);
-        config.clearProperty(APIKEY_PROPERTY);
-        config.clearProperty(ENDPOINT_PROPERTY);
-        config.clearProperty(MODEL_NAME_PROPERTY);
-    }
-
-    private void migrateProviderModels() {
-        HierarchicalConfiguration config = (HierarchicalConfiguration) getConfig();
-        List<HierarchicalConfiguration> fields = config.configurationsAt(ALL_PROVIDERS_KEY);
-        for (int i = 0; i < fields.size(); ++i) {
-            HierarchicalConfiguration sub = fields.get(i);
-            List<?> models = sub.getList(PROVIDER_MODELS_KEY);
-            if (models != null && !models.isEmpty()) {
-                continue;
-            }
-
-            String modelName = sub.getString(PROVIDER_MODEL_NAME_KEY, "");
-            if (StringUtils.isBlank(modelName)) {
-                continue;
-            }
-            String elementBaseKey = ALL_PROVIDERS_KEY + "(" + i + ").";
-            config.setProperty(elementBaseKey + PROVIDER_MODELS_KEY + "(0)", modelName);
-        }
-    }
+    protected void updateConfigsImpl(int fileVersion) {}
 
     public String getApiKey() {
         LlmProviderConfig config = getDefaultProviderConfig();
@@ -217,6 +157,9 @@ public class LlmOptions extends VersionedAbstractParam {
     }
 
     public boolean isCommsConfigured() {
+        if (StringUtils.isBlank(defaultProviderName)) {
+            return false;
+        }
         LlmProviderConfig config = getDefaultProviderConfig();
         if (config == null || LlmProvider.NONE.equals(config.getProvider())) {
             return false;
@@ -226,6 +169,9 @@ public class LlmOptions extends VersionedAbstractParam {
     }
 
     public String getCommsIssue() {
+        if (StringUtils.isBlank(defaultProviderName)) {
+            return Constant.messages.getString("llm.error.provider");
+        }
         LlmProviderConfig config = getDefaultProviderConfig();
         if (config == null || LlmProvider.NONE.equals(config.getProvider())) {
             return Constant.messages.getString("llm.error.provider");
@@ -278,8 +224,7 @@ public class LlmOptions extends VersionedAbstractParam {
             return config;
         }
         LlmProviderConfig created =
-                new LlmProviderConfig(
-                        DEFAULT_PROVIDER_NAME, LlmProvider.NONE, "", "", List.of());
+                new LlmProviderConfig(DEFAULT_PROVIDER_NAME, LlmProvider.NONE, "", "", List.of());
         providerConfigs.add(created);
         defaultProviderName = created.getName();
         defaultModelName = "";
@@ -299,9 +244,9 @@ public class LlmOptions extends VersionedAbstractParam {
             getConfig().setProperty(elementBaseKey + PROVIDER_ENDPOINT_KEY, config.getEndpoint());
             getConfig()
                     .setProperty(
-                            elementBaseKey + PROVIDER_MODEL_NAME_KEY, getDefaultModelNameFor(config));
-            ((HierarchicalConfiguration) getConfig())
-                    .clearTree(elementBaseKey + "models");
+                            elementBaseKey + PROVIDER_MODEL_NAME_KEY,
+                            getDefaultModelNameFor(config));
+            ((HierarchicalConfiguration) getConfig()).clearTree(elementBaseKey + "models");
             List<String> models = config.getModels();
             for (int j = 0; j < models.size(); ++j) {
                 getConfig()
@@ -324,6 +269,7 @@ public class LlmOptions extends VersionedAbstractParam {
         normalizeDefaultProviderName();
         normalizeDefaultModelName();
         getConfig().setProperty(DEFAULT_PROVIDER_PROPERTY, this.defaultProviderName);
+        getConfig().setProperty(PROVIDERS_BASE_KEY + ".defaultModel", defaultModelName);
     }
 
     public String getDefaultModelName() {
@@ -340,6 +286,9 @@ public class LlmOptions extends VersionedAbstractParam {
         if (providerConfigs.isEmpty()) {
             return null;
         }
+        if (StringUtils.isBlank(defaultProviderName)) {
+            return null;
+        }
         if (!StringUtils.isBlank(defaultProviderName)) {
             for (LlmProviderConfig config : providerConfigs) {
                 if (defaultProviderName.equals(config.getName())) {
@@ -351,6 +300,9 @@ public class LlmOptions extends VersionedAbstractParam {
     }
 
     private void normalizeDefaultProviderName() {
+        if (StringUtils.isBlank(defaultProviderName)) {
+            return;
+        }
         if (providerConfigs.isEmpty()) {
             defaultProviderName = "";
             defaultModelName = "";
@@ -365,6 +317,10 @@ public class LlmOptions extends VersionedAbstractParam {
     }
 
     private void normalizeDefaultModelName() {
+        if (StringUtils.isBlank(defaultProviderName)) {
+            defaultModelName = "";
+            return;
+        }
         LlmProviderConfig config = getDefaultProviderConfigInternal();
         if (config == null) {
             defaultModelName = "";
@@ -405,6 +361,9 @@ public class LlmOptions extends VersionedAbstractParam {
 
     private String getDefaultModelNameFor(LlmProviderConfig config) {
         if (config == null) {
+            return "";
+        }
+        if (StringUtils.isBlank(defaultProviderName)) {
             return "";
         }
         if (config.getName().equals(defaultProviderName)

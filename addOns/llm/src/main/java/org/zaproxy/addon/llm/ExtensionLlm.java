@@ -24,14 +24,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
 import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
-
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -62,7 +60,6 @@ public class ExtensionLlm extends ExtensionAdaptor {
             "/org/zaproxy/addon/llm/resources/agent.png";
     private static final String TOOLBAR_ICON_FALLBACK = "/resource/icon/16/041.png";
 
-    private LlmChatPanel llmChatPanel;
     private LlmOptions options;
     private LlmOptions prevOptions;
     private Map<String, LlmCommunicationService> commsServices =
@@ -204,33 +201,31 @@ public class ExtensionLlm extends ExtensionAdaptor {
     private JPopupMenu buildProvidersMenu() {
         JPopupMenu menu = new JPopupMenu();
         List<LlmProviderConfig> configs = options.getProviderConfigs();
+        String noneLabel = LlmProvider.NONE.toString();
+        String defaultName = options.getDefaultProviderName();
+        String defaultModel = options.getDefaultModelName();
+        boolean noneSelected = defaultName == null || defaultName.isEmpty();
+        ButtonGroup group = new ButtonGroup();
+        addProviderModelItem(menu, group, noneLabel, "", noneSelected);
+
         if (configs.isEmpty()) {
             JMenuItem empty =
-                    new JMenuItem(
-                            Constant.messages.getString("llm.toolbar.providers.none"));
+                    new JMenuItem(Constant.messages.getString("llm.toolbar.providers.none"));
             empty.setEnabled(false);
             menu.add(empty);
             return menu;
         }
 
-        String defaultName = options.getDefaultProviderName();
-        String defaultModel = options.getDefaultModelName();
-        ButtonGroup group = new ButtonGroup();
         for (LlmProviderConfig config : configs) {
             String name = config.getName();
             List<String> models = config.getModels();
             if (models.isEmpty()) {
                 addProviderModelItem(
-                        menu,
-                        group,
-                        name,
-                        "",
-                        name.equals(defaultName) && defaultModel.isEmpty());
+                        menu, group, name, "", name.equals(defaultName) && defaultModel.isEmpty());
                 continue;
             }
             for (String model : models) {
-                boolean isDefault =
-                        name.equals(defaultName) && model.equals(defaultModel);
+                boolean isDefault = name.equals(defaultName) && model.equals(defaultModel);
                 addProviderModelItem(menu, group, name, model, isDefault);
             }
         }
@@ -247,7 +242,9 @@ public class ExtensionLlm extends ExtensionAdaptor {
         if (!modelName.isEmpty()) {
             label += " - " + modelName;
         } else {
-            label += " - " + Constant.messages.getString("llm.toolbar.model.empty");
+            if (!providerName.equals(LlmProvider.NONE.toString())) {
+                label += " - " + Constant.messages.getString("llm.toolbar.model.empty");
+            }
         }
         if (isDefault) {
             label += Constant.messages.getString("llm.toolbar.default.suffix");
@@ -264,12 +261,18 @@ public class ExtensionLlm extends ExtensionAdaptor {
             return;
         }
 
-        if (name.equals(options.getDefaultProviderName())
+        String providerName = name;
+        if (LlmProvider.NONE.toString().equals(providerName)) {
+            providerName = "";
+            modelName = "";
+        }
+
+        if (providerName.equals(options.getDefaultProviderName())
                 && modelName.equals(options.getDefaultModelName())) {
             return;
         }
 
-        options.setDefaultProviderName(name);
+        options.setDefaultProviderName(providerName);
         options.setDefaultModelName(modelName);
         try {
             options.getConfig().save();
@@ -289,12 +292,5 @@ public class ExtensionLlm extends ExtensionAdaptor {
             return null;
         }
         return new ImageIcon(icon);
-    }
-    
-    private LlmChatPanel getLlmChatPanel() {
-        if (llmChatPanel == null) {
-            llmChatPanel = new LlmChatPanel(this);
-        }
-        return llmChatPanel;
     }
 }

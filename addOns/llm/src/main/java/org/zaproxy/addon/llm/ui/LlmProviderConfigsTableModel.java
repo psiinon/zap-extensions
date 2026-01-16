@@ -27,7 +27,8 @@ import org.zaproxy.addon.llm.LlmProviderConfig;
 import org.zaproxy.zap.view.AbstractMultipleOptionsTableModel;
 
 @SuppressWarnings("serial")
-public class LlmProviderConfigsTableModel extends AbstractMultipleOptionsTableModel<LlmProviderConfig> {
+public class LlmProviderConfigsTableModel
+        extends AbstractMultipleOptionsTableModel<LlmProviderConfig> {
 
     private static final long serialVersionUID = 1L;
 

@@ -31,7 +31,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
-import javax.swing.border.Border;
 import javax.swing.border.EmptyBorder;
 import org.apache.commons.lang3.StringUtils;
 import org.parosproxy.paros.Constant;
@@ -138,7 +137,7 @@ public class LlmChatPanel extends AbstractPanel {
         ExtensionHelp.enableHelpKey(this, "addon.llm.chat");
     }
 
-    private Border getInputPanelTopBorder() {
+    private void updateInputPanelBorder() {
         Color borderColor = UIManager.getColor("Separator.foreground");
         if (borderColor == null) {
             borderColor = UIManager.getColor("controlShadow");
@@ -146,14 +145,11 @@ public class LlmChatPanel extends AbstractPanel {
         if (borderColor == null) {
             borderColor = Color.LIGHT_GRAY;
         }
-        return BorderFactory.createMatteBorder(1, 0, 0, 0, borderColor);
-    }
-
-    private void updateInputPanelBorder() {
         if (inputPanel != null) {
             inputPanel.setBorder(
                     BorderFactory.createCompoundBorder(
-                            getInputPanelTopBorder(), new EmptyBorder(10, 10, 10, 10)));
+                            BorderFactory.createMatteBorder(1, 0, 0, 0, borderColor),
+                            new EmptyBorder(10, 10, 10, 10)));
         }
     }
 
@@ -232,7 +228,10 @@ public class LlmChatPanel extends AbstractPanel {
                     } else {
                         appendMessage(Constant.messages.getString(key));
                     }
-                    resetInput();
+                    inputArea.setEnabled(true);
+                    sendButton.setEnabled(true);
+                    isProcessing = false;
+                    inputArea.requestFocusInWindow();
                 });
     }
 
@@ -247,13 +246,6 @@ public class LlmChatPanel extends AbstractPanel {
 
         // Auto-scroll to bottom
         messageArea.setCaretPosition(messageArea.getDocument().getLength());
-    }
-
-    private void resetInput() {
-        inputArea.setEnabled(true);
-        sendButton.setEnabled(true);
-        isProcessing = false;
-        inputArea.requestFocusInWindow();
     }
 
     public void appendToInput(String str) {
