@@ -447,24 +447,30 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
             }
         }
         if (script.getEngine() != null) {
-            // Save any changes to previous script
-            this.saveChanges();
+            // TODO
+            executeInEdt(
+                    () -> {
+                        // Save any changes to previous script
+                        this.saveChanges();
 
-            // push to ScriptConsole
-            this.getConsolePanel().setScript(script, allowFocus);
+                        // push to ScriptConsole
+                        this.getConsolePanel().setScript(script, allowFocus);
 
-            // Show in the tree panel
-            ScriptNode node = this.getExtScript().getTreeModel().getNodeForScript(script);
-            if (node != null) {
-                this.getScriptsPanel().showInTree(node);
-            }
+                        // Show in the tree panel
+                        ScriptNode node =
+                                this.getExtScript().getTreeModel().getNodeForScript(script);
+                        if (node != null) {
+                            this.getScriptsPanel().showInTree(node);
+                        }
 
-            this.getConsolePanel()
-                    .getCommandPanel()
-                    .setScriptTooltip(
-                            script.getEngine().isTextBased()
-                                    ? null
-                                    : Constant.messages.getString("scripts.welcome.nontext"));
+                        this.getConsolePanel()
+                                .getCommandPanel()
+                                .setScriptTooltip(
+                                        script.getEngine().isTextBased()
+                                                ? null
+                                                : Constant.messages.getString(
+                                                        "scripts.welcome.nontext"));
+                    });
         }
     }
 
@@ -491,17 +497,22 @@ public class ExtensionScriptsUI extends ExtensionAdaptor implements ScriptEventL
             }
         }
         if (script.getEngine() != null) {
-            // Save any changes to previous script
-            this.saveChanges();
+            executeInEdt(
+                    () -> { // TODO
 
-            // push to ScriptConsole
-            this.getConsolePanel().setTemplate(script);
+                        // Save any changes to previous script
+                        this.saveChanges();
 
-            // Show in the tree panel
-            ScriptNode node = this.getExtScript().getTreeModel().getNodeForScript(script);
-            if (node != null) {
-                this.getScriptsPanel().showInTree(node);
-            }
+                        // push to ScriptConsole
+                        this.getConsolePanel().setTemplate(script);
+
+                        // Show in the tree panel
+                        ScriptNode node =
+                                this.getExtScript().getTreeModel().getNodeForScript(script);
+                        if (node != null) {
+                            this.getScriptsPanel().showInTree(node);
+                        }
+                    });
         }
     }
 

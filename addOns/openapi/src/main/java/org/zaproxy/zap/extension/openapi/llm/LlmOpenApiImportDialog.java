@@ -144,7 +144,8 @@ public class LlmOpenApiImportDialog extends AbstractDialog {
             return false;
         }
 
-        if (StringUtils.isEmpty(options.getEndpoint())) {
+        if (options.getModelProvider().supportsEndpoint()
+                && StringUtils.isEmpty(options.getEndpoint())) {
             showWarningDialog(
                     Constant.messages.getString("openapi.llm.importDialog.error.llmNotConfigured"));
             return false;

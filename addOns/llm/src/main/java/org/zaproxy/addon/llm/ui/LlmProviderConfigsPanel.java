@@ -20,15 +20,17 @@
 package org.zaproxy.addon.llm.ui;
 
 import java.awt.Dialog;
+
 import javax.swing.JOptionPane;
 import javax.swing.SortOrder;
+
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.llm.LlmProviderConfig;
-import org.zaproxy.zap.view.AbstractMultipleOptionsTablePanel;
+import org.zaproxy.zap.view.AbstractMultipleOptionsBaseTablePanel;
 
 @SuppressWarnings("serial")
-public class LlmProviderConfigsPanel extends AbstractMultipleOptionsTablePanel<LlmProviderConfig> {
+public class LlmProviderConfigsPanel extends AbstractMultipleOptionsBaseTablePanel<LlmProviderConfig> {
 
     private static final long serialVersionUID = 1L;
 
