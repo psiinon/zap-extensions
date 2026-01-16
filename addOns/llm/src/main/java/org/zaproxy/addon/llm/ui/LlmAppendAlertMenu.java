@@ -19,7 +19,6 @@
  */
 package org.zaproxy.addon.llm.ui;
 
-import java.util.Set;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.core.scanner.Alert;
 import org.zaproxy.zap.extension.alert.PopupMenuItemAlert;
@@ -41,14 +40,7 @@ public class LlmAppendAlertMenu extends PopupMenuItemAlert {
         appendAlertToInput(alert);
     }
 
-    @Override
-    protected void performActions(Set<Alert> alerts) {
-        for (Alert alert : alerts) {
-            appendAlertToInput(alert);
-        }
-    }
-
-    public void appendAlertToInput(Alert alert) {
+    private void appendAlertToInput(Alert alert) {
         StringBuilder sb = new StringBuilder();
 
         LlmChatPanel.appendFormattedMsg(

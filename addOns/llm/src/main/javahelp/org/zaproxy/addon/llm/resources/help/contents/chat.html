@@ -10,13 +10,14 @@
 The LLM Chat panel provides an interactive chat interface that allows you to communicate directly with the configured Large Language Model (LLM). This feature enables you to ask questions, get explanations, and receive assistance from the LLM in real-time.
 
 <H2>Accessing the Chat Panel</H2>
-The LLM Chat panel appears as a tab in the main ZAP Work panel area. You can access it by clicking on the "LLM Chat" tab.
+
+The LLM Chat panel appears as a tab in the ZAP Workspace window. You can access it by clicking on the "LLM Chat" tab.
 
 <H2>Using the Chat Interface</H2>
 The chat interface consists of:
 <ul>
     <li><b>Message Area:</b> Displays the conversation history between you and the LLM assistant. Messages are shown with labels indicating who sent them ("You" for your messages, "Assistant" for LLM responses). Located in the top portion of the panel.</li>
-    <li><b>Input Area:</b> A multi-line text area at the bottom of the panel where you type your questions or messages. You can resize the boundary between the message area and input area by dragging the divider.</li>
+    <li><b>Input Area:</b> A multi-line text area at the bottom of the panel where you type your questions or messages.</li>
     <li><b>Send Button:</b> Click to send your message to the LLM.</li>
     <li><b>Resizable Divider:</b> A divider between the message area and input area that can be dragged to adjust the relative sizes of each section.</li>
 </ul>
@@ -31,12 +32,7 @@ To send a message to the LLM:
 </ol>
 
 <H2>Requirements</H2>
-Before using the LLM Chat feature, you must:
-<ul>
-    <li>Configure an LLM provider in the <a href="options.html">Options</a> panel.</li>
-    <li>Ensure that the LLM endpoint is accessible and properly configured.</li>
-    <li>Have a valid API key (if required by your chosen provider).</li>
-</ul>
+Before using the LLM Chat feature, you must have configured the LLM provider via the <a href="options.html">Options</a> panel.<br>
 If the LLM is not configured, you will see an error message when attempting to send a message.
 
 <H2>Error Handling</H2>
@@ -48,7 +44,7 @@ The chat panel handles various error conditions:
 </ul>
 
 <H2>Appending ZAP Data to Chat</H2>
-You can quickly add data from ZAP directly into the chat input area using right-click menu items:
+You can quickly add data from ZAP directly into the chat input area using context menu items:
 
 <H3>Appending Alerts</H3>
 To append alert information to the chat:

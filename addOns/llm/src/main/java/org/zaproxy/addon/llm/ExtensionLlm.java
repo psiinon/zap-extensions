@@ -24,19 +24,20 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
 import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JMenuItem;
 import javax.swing.JPopupMenu;
 import javax.swing.JRadioButtonMenuItem;
+
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
-import org.parosproxy.paros.extension.ExtensionHookView;
 import org.parosproxy.paros.extension.OptionsChangedListener;
 import org.parosproxy.paros.model.OptionsParam;
 import org.zaproxy.addon.llm.services.LlmCommunicationService;
@@ -61,10 +62,6 @@ public class ExtensionLlm extends ExtensionAdaptor {
             "/org/zaproxy/addon/llm/resources/agent.png";
     private static final String TOOLBAR_ICON_FALLBACK = "/resource/icon/16/041.png";
 
-    private LlmAppendAlertMenu llmAppendAlertMenu;
-    private LlmAppendHttpMessageMenu llmAppendRequestMenu;
-    private LlmAppendHttpMessageMenu llmAppendResponseMenu;
-    private LlmAppendHttpMessageMenu llmAppendRequestResponseMenu;
     private LlmChatPanel llmChatPanel;
     private LlmOptions options;
     private LlmOptions prevOptions;
@@ -108,14 +105,36 @@ public class ExtensionLlm extends ExtensionAdaptor {
                 });
 
         if (hasView()) {
-            ExtensionHookView hookView = extensionHook.getHookView();
-            hookView.addOptionPanel(new LlmOptionsPanel());
-            hookView.addMainToolBarComponent(getProviderSelectorButton());
-            hookView.addWorkPanel(getLlmChatPanel());
-            extensionHook.getHookMenu().addPopupMenuItem(getLlmAppendAlertMenu());
-            extensionHook.getHookMenu().addPopupMenuItem(getLlmAppendRequestMenu());
-            extensionHook.getHookMenu().addPopupMenuItem(getLlmAppendResponseMenu());
-            extensionHook.getHookMenu().addPopupMenuItem(getLlmAppendRequestResponseMenu());
+            LlmChatPanel llmChatPanel = new LlmChatPanel(this);
+            extensionHook.getHookView().addOptionPanel(new LlmOptionsPanel());
+            extensionHook.getHookView().addMainToolBarComponent(getProviderSelectorButton());
+            extensionHook.getHookView().addWorkPanel(llmChatPanel);
+            extensionHook.getHookMenu().addPopupMenuItem(new LlmAppendAlertMenu(llmChatPanel));
+            extensionHook
+                    .getHookMenu()
+                    .addPopupMenuItem(
+                            new LlmAppendHttpMessageMenu(
+                                    llmChatPanel,
+                                    Constant.messages.getString("llm.menu.append.request.title"),
+                                    true,
+                                    false));
+            extensionHook
+                    .getHookMenu()
+                    .addPopupMenuItem(
+                            new LlmAppendHttpMessageMenu(
+                                    llmChatPanel,
+                                    Constant.messages.getString("llm.menu.append.response.title"),
+                                    false,
+                                    true));
+            extensionHook
+                    .getHookMenu()
+                    .addPopupMenuItem(
+                            new LlmAppendHttpMessageMenu(
+                                    llmChatPanel,
+                                    Constant.messages.getString(
+                                            "llm.menu.append.requestresponse.title"),
+                                    true,
+                                    true));
         }
     }
 
@@ -277,48 +296,5 @@ public class ExtensionLlm extends ExtensionAdaptor {
             llmChatPanel = new LlmChatPanel(this);
         }
         return llmChatPanel;
-    }
-
-    private LlmAppendAlertMenu getLlmAppendAlertMenu() {
-        if (llmAppendAlertMenu == null) {
-            llmAppendAlertMenu = new LlmAppendAlertMenu(getLlmChatPanel());
-        }
-        return llmAppendAlertMenu;
-    }
-
-    private LlmAppendHttpMessageMenu getLlmAppendRequestMenu() {
-        if (llmAppendRequestMenu == null) {
-            llmAppendRequestMenu =
-                    new LlmAppendHttpMessageMenu(
-                            getLlmChatPanel(),
-                            Constant.messages.getString("llm.menu.append.request.title"),
-                            true,
-                            false);
-        }
-        return llmAppendRequestMenu;
-    }
-
-    private LlmAppendHttpMessageMenu getLlmAppendResponseMenu() {
-        if (llmAppendResponseMenu == null) {
-            llmAppendResponseMenu =
-                    new LlmAppendHttpMessageMenu(
-                            getLlmChatPanel(),
-                            Constant.messages.getString("llm.menu.append.response.title"),
-                            false,
-                            true);
-        }
-        return llmAppendResponseMenu;
-    }
-
-    private LlmAppendHttpMessageMenu getLlmAppendRequestResponseMenu() {
-        if (llmAppendRequestResponseMenu == null) {
-            llmAppendRequestResponseMenu =
-                    new LlmAppendHttpMessageMenu(
-                            getLlmChatPanel(),
-                            Constant.messages.getString("llm.menu.append.requestresponse.title"),
-                            true,
-                            true);
-        }
-        return llmAppendRequestResponseMenu;
     }
 }

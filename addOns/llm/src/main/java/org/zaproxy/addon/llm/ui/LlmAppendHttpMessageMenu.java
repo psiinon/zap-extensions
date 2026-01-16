@@ -62,19 +62,18 @@ public class LlmAppendHttpMessageMenu extends PopupMenuItemHttpMessageContainer 
             sb.append(Constant.messages.getString("llm.chat.append.http.request.header"))
                     .append("\n");
             sb.append(httpMessage.getRequestHeader().toString());
-            if (httpMessage.getRequestBody() != null && httpMessage.getRequestBody().length() > 0) {
+            if (httpMessage.getRequestBody().length() > 0) {
                 sb.append("\n");
                 sb.append(httpMessage.getRequestBody().toString());
             }
             sb.append("\n\n");
         }
 
-        if (includeResponse && httpMessage.getResponseHeader() != null) {
+        if (includeResponse && !httpMessage.getResponseHeader().isEmpty()) {
             sb.append(Constant.messages.getString("llm.chat.append.http.response.header"))
                     .append("\n");
             sb.append(httpMessage.getResponseHeader().toString());
-            if (httpMessage.getResponseBody() != null
-                    && httpMessage.getResponseBody().length() > 0) {
+            if (httpMessage.getResponseBody().length() > 0) {
                 sb.append("\n");
                 sb.append(httpMessage.getResponseBody().toString());
             }
