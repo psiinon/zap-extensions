@@ -195,28 +195,63 @@ public class ExtensionLlm extends ExtensionAdaptor {
         }
 
         String defaultName = options.getDefaultProviderName();
+        String defaultModel = options.getDefaultModelName();
         ButtonGroup group = new ButtonGroup();
         for (LlmProviderConfig config : configs) {
             String name = config.getName();
-            boolean isDefault = name.equals(defaultName);
-            String label = name;
-            if (isDefault) {
-                label += Constant.messages.getString("llm.toolbar.default.suffix");
+            List<String> models = config.getModels();
+            if (models.isEmpty()) {
+                addProviderModelItem(
+                        menu,
+                        group,
+                        name,
+                        "",
+                        name.equals(defaultName) && defaultModel.isEmpty());
+                continue;
             }
-            JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, isDefault);
-            item.addActionListener(e -> setDefaultProvider(name));
-            group.add(item);
-            menu.add(item);
+            for (String model : models) {
+                boolean isDefault =
+                        name.equals(defaultName) && model.equals(defaultModel);
+                addProviderModelItem(menu, group, name, model, isDefault);
+            }
         }
         return menu;
     }
 
-    private void setDefaultProvider(String name) {
-        if (name == null || name.equals(options.getDefaultProviderName())) {
+    private void addProviderModelItem(
+            JPopupMenu menu,
+            ButtonGroup group,
+            String providerName,
+            String modelName,
+            boolean isDefault) {
+        String label = providerName;
+        if (!modelName.isEmpty()) {
+            label += " - " + modelName;
+        } else {
+            label += " - " + Constant.messages.getString("llm.toolbar.model.empty");
+        }
+        if (isDefault) {
+            label += Constant.messages.getString("llm.toolbar.default.suffix");
+        }
+
+        JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, isDefault);
+        item.addActionListener(e -> setDefaultProvider(providerName, modelName));
+        group.add(item);
+        menu.add(item);
+    }
+
+    private void setDefaultProvider(String name, String modelName) {
+        if (name == null) {
+            return;
+        }
+
+        if (name.equals(options.getDefaultProviderName())
+                && modelName.equals(options.getDefaultModelName())) {
             return;
         }
 
         options.setDefaultProviderName(name);
+        options.setDefaultModelName(modelName);
         try {
             options.getConfig().save();
         } catch (ConfigurationException e) {

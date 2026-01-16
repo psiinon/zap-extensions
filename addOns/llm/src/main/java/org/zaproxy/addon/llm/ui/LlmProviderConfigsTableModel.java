@@ -34,7 +34,7 @@ public class LlmProviderConfigsTableModel extends AbstractMultipleOptionsTableMo
     private static final String[] COLUMN_NAMES = {
         Constant.messages.getString("llm.options.providers.table.header.name"),
         Constant.messages.getString("llm.options.providers.table.header.provider"),
-        Constant.messages.getString("llm.options.providers.table.header.model"),
+        Constant.messages.getString("llm.options.providers.table.header.models"),
         Constant.messages.getString("llm.options.providers.table.header.endpoint")
     };
 
@@ -71,7 +71,7 @@ public class LlmProviderConfigsTableModel extends AbstractMultipleOptionsTableMo
             case 1:
                 return config.getProvider().toString();
             case 2:
-                return config.getModelName();
+                return String.join(", ", config.getModels());
             case 3:
                 return config.getEndpoint();
             default:

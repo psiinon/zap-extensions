@@ -19,6 +19,8 @@
  */
 package org.zaproxy.addon.llm;
 
+import java.util.ArrayList;
+import java.util.List;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
@@ -33,20 +35,24 @@ public class LlmProviderConfig implements EnableableInterface {
     private LlmProvider provider;
     private String apiKey;
     private String endpoint;
-    private String modelName;
+    private List<String> models;
     private boolean enabled = true;
 
     public LlmProviderConfig(
-            String name, LlmProvider provider, String apiKey, String endpoint, String modelName) {
+            String name,
+            LlmProvider provider,
+            String apiKey,
+            String endpoint,
+            List<String> models) {
         this.name = name;
         this.provider = provider;
         this.apiKey = apiKey;
         this.endpoint = endpoint;
-        this.modelName = modelName;
+        this.models = new ArrayList<>(models);
     }
 
     public LlmProviderConfig(LlmProviderConfig other) {
-        this(other.name, other.provider, other.apiKey, other.endpoint, other.modelName);
+        this(other.name, other.provider, other.apiKey, other.endpoint, other.models);
         this.enabled = other.enabled;
     }
 }

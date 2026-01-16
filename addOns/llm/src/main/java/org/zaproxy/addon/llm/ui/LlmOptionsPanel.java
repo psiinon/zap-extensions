@@ -38,6 +38,7 @@ public class LlmOptionsPanel extends AbstractParamPanel {
 
     private LlmProviderConfigsTableModel providerConfigsModel;
     private final JComboBox<String> defaultProviderComboBox;
+    private final JComboBox<String> defaultModelComboBox;
 
     public LlmOptionsPanel() {
         super();
@@ -62,13 +63,23 @@ public class LlmOptionsPanel extends AbstractParamPanel {
 
         gbc.gridx = 0;
         gbc.gridy = 1;
+        gbc.weightx = 0.0;
+        add(new JLabel(Constant.messages.getString("llm.options.providers.default.model.label")), gbc);
+
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        defaultModelComboBox = new JComboBox<>();
+        add(defaultModelComboBox, gbc);
+
+        gbc.gridx = 0;
+        gbc.gridy = 2;
         gbc.gridwidth = 2;
         gbc.weightx = 1.0;
         add(new JLabel(Constant.messages.getString("llm.options.providers.label")), gbc);
 
         LlmProviderConfigsPanel providerConfigsPanel =
                 new LlmProviderConfigsPanel(getProviderConfigsTableModel());
-        gbc.gridy = 2;
+        gbc.gridy = 3;
         gbc.weighty = 1.0;
         gbc.fill = GridBagConstraints.BOTH;
         add(providerConfigsPanel, gbc);
@@ -81,6 +92,7 @@ public class LlmOptionsPanel extends AbstractParamPanel {
                                 refreshDefaultProviderOptions();
                             }
                         });
+        defaultProviderComboBox.addActionListener(e -> refreshDefaultModelOptions());
     }
 
     @Override
@@ -98,6 +110,12 @@ public class LlmOptionsPanel extends AbstractParamPanel {
                 && defaultProviderComboBox.getItemCount() > 0) {
             defaultProviderComboBox.setSelectedIndex(0);
         }
+        refreshDefaultModelOptions();
+        defaultModelComboBox.setSelectedItem(llmOptionsParam.getDefaultModelName());
+        if (defaultModelComboBox.getSelectedItem() == null
+                && defaultModelComboBox.getItemCount() > 0) {
+            defaultModelComboBox.setSelectedIndex(0);
+        }
     }
 
     @Override
@@ -106,6 +124,8 @@ public class LlmOptionsPanel extends AbstractParamPanel {
         param.setProviderConfigs(getProviderConfigsTableModel().getElements());
         Object selected = defaultProviderComboBox.getSelectedItem();
         param.setDefaultProviderName(selected != null ? selected.toString() : "");
+        Object selectedModel = defaultModelComboBox.getSelectedItem();
+        param.setDefaultModelName(selectedModel != null ? selectedModel.toString() : "");
     }
 
     private LlmProviderConfigsTableModel getProviderConfigsTableModel() {
@@ -128,5 +148,37 @@ public class LlmOptionsPanel extends AbstractParamPanel {
                 && defaultProviderComboBox.getItemCount() > 0) {
             defaultProviderComboBox.setSelectedIndex(0);
         }
+    }
+
+    private void refreshDefaultModelOptions() {
+        Object selected = defaultModelComboBox.getSelectedItem();
+        defaultModelComboBox.removeAllItems();
+        LlmProviderConfig config = getSelectedProviderConfig();
+        if (config != null) {
+            for (String model : config.getModels()) {
+                defaultModelComboBox.addItem(model);
+            }
+        }
+        if (selected != null) {
+            defaultModelComboBox.setSelectedItem(selected);
+        }
+        if (defaultModelComboBox.getSelectedItem() == null
+                && defaultModelComboBox.getItemCount() > 0) {
+            defaultModelComboBox.setSelectedIndex(0);
+        }
+    }
+
+    private LlmProviderConfig getSelectedProviderConfig() {
+        Object selected = defaultProviderComboBox.getSelectedItem();
+        if (selected == null) {
+            return null;
+        }
+        String name = selected.toString();
+        for (LlmProviderConfig config : getProviderConfigsTableModel().getElements()) {
+            if (name.equals(config.getName())) {
+                return config;
+            }
+        }
+        return null;
     }
 }

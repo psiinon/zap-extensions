@@ -22,12 +22,16 @@ package org.zaproxy.addon.llm.ui;
 import java.awt.Dialog;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import javax.swing.GroupLayout;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
@@ -51,7 +55,7 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
     protected final JComboBox<LlmProvider> providerComboBox;
     protected final JPasswordField apiKeyField;
     protected final JTextField endpointField;
-    protected final JTextField modelNameField;
+    protected final JTextArea modelsArea;
 
     protected final LlmProviderConfigsTableModel model;
 
@@ -101,9 +105,12 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
         endpointLabel.setLabelFor(endpointField);
 
         JLabel modelNameLabel =
-                new JLabel(Constant.messages.getString("llm.options.providers.field.modelname"));
-        modelNameField = new JTextField(30);
-        modelNameLabel.setLabelFor(modelNameField);
+                new JLabel(Constant.messages.getString("llm.options.providers.field.models"));
+        modelsArea = new JTextArea(5, 30);
+        modelsArea.setLineWrap(true);
+        modelsArea.setWrapStyleWord(true);
+        JScrollPane modelsScrollPane = new JScrollPane(modelsArea);
+        modelNameLabel.setLabelFor(modelsArea);
 
         layout.setHorizontalGroup(
                 layout.createParallelGroup()
@@ -124,7 +131,7 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
                                                         .addComponent(providerComboBox)
                                                         .addComponent(apiKeyField)
                                                         .addComponent(endpointField)
-                                                        .addComponent(modelNameField))));
+                                                        .addComponent(modelsScrollPane))));
 
         layout.setVerticalGroup(
                 layout.createSequentialGroup()
@@ -147,7 +154,7 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
                         .addGroup(
                                 layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
                                         .addComponent(modelNameLabel)
-                                        .addComponent(modelNameField)));
+                                        .addComponent(modelsScrollPane)));
 
         initView();
         setConfirmButtonEnabled(true);
@@ -169,7 +176,7 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
         providerComboBox.setSelectedIndex(0);
         apiKeyField.setText("");
         endpointField.setText("");
-        modelNameField.setText("");
+        modelsArea.setText("");
         providerConfig = null;
         originalName = null;
         lastSuggestedName = null;
@@ -229,7 +236,7 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
                         provider,
                         new String(apiKeyField.getPassword()),
                         endpoint,
-                        StringUtils.trimToEmpty(modelNameField.getText()));
+                        parseModels());
     }
 
     public LlmProviderConfig getProviderConfig() {
@@ -281,5 +288,16 @@ public class AddLlmProviderDialog extends AbstractFormDialog {
             }
         }
         return true;
+    }
+
+    private List<String> parseModels() {
+        List<String> models = new ArrayList<>();
+        for (String line : modelsArea.getText().split("\\R")) {
+            String trimmed = StringUtils.trimToEmpty(line);
+            if (!trimmed.isEmpty()) {
+                models.add(trimmed);
+            }
+        }
+        return models;
     }
 }
