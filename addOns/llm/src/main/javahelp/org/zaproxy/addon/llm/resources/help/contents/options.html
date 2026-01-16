@@ -8,15 +8,20 @@
 <H1>Options</H1>
 
 <section>
-    <h2>Model Provider</h2>
+    <h2>Model Providers</h2>
     <p>
-        Select the model provider you want to use for your LLM requests. The current supported model providers are listed below:
+        Configure one or more model providers. Each provider entry has a unique name, which is used
+        to select it in other parts of the UI. You can add, modify, and remove providers from the
+        list. The default provider is used when an LLM is required and no other provider is chosen.
+    </p>
+    <p>
+        The current supported model providers are:
+    </p>
     <ul>
         <li>Azure OpenAI
         <li>Google Gemini
         <li>Ollama
     </ul>
-    </p>
 </section>
 
 <h3>Azure OpenAI</h3>
@@ -39,24 +44,17 @@ You will typically not need to specify an API key. Local models do not need an A
 If you have Ollama installed on the same machine as ZAP then by default the endpoint will be <code>http://localhost:11434/</code>.
 
 <section>
-    <h2>API Key</h2>
+    <h2>Provider Fields</h2>
     <p>
-        The API key if required to access your LLM API service.
+        Each model provider has the following fields:
     </p>
-</section>
-
-<section>
-    <h2>Endpoint Base URL</h2>
-    <p>
-        The endpoint base URL is the root URL for all API requests to your LLM API service.
-    </p>
-</section>
-
-<section>
-    <h2>LLM Model Name</h2>
-    <p>
-        The LLM model name specifies which language model you want to use for your requests.
-    </p>
+    <ul>
+        <li><strong>Name</strong>: A unique name for the provider entry.
+        <li><strong>Provider</strong>: The type of model provider (Azure OpenAI, Google Gemini, or Ollama).
+        <li><strong>API Key</strong>: The API key, if required by the provider.
+        <li><strong>Endpoint Base URL</strong>: The base URL for API requests (not required for Google Gemini).
+        <li><strong>Model Name</strong>: The model or deployment name to use.
+    </ul>
 </section>
 
 

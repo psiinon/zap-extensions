@@ -19,12 +19,24 @@
  */
 package org.zaproxy.addon.llm;
 
+import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import javax.swing.ButtonGroup;
+import javax.swing.ImageIcon;
+import javax.swing.JButton;
+import javax.swing.JMenuItem;
+import javax.swing.JPopupMenu;
+import javax.swing.JRadioButtonMenuItem;
+import org.apache.commons.configuration.ConfigurationException;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
+import org.parosproxy.paros.extension.ExtensionHookView;
 import org.parosproxy.paros.extension.OptionsChangedListener;
 import org.parosproxy.paros.model.OptionsParam;
 import org.zaproxy.addon.llm.services.LlmCommunicationService;
@@ -36,14 +48,20 @@ import org.zaproxy.addon.llm.ui.LlmOptionsPanel;
  */
 public class ExtensionLlm extends ExtensionAdaptor {
 
+    private static final Logger LOGGER = LogManager.getLogger(ExtensionLlm.class);
+
     public static final String NAME = "ExtensionLlm";
 
     protected static final String PREFIX = "llm";
+
+    private static final String TOOLBAR_ICON_RESOURCE = "/resource/icon/fugue/brain.png";
+    private static final String TOOLBAR_ICON_FALLBACK = "/resource/icon/16/041.png";
 
     private LlmOptions options;
     private LlmOptions prevOptions;
     private Map<String, LlmCommunicationService> commsServices =
             Collections.synchronizedMap(new HashMap<>());
+    private JButton providerSelectorButton;
 
     public ExtensionLlm() {
         super(NAME);
@@ -75,13 +93,15 @@ public class ExtensionLlm extends ExtensionAdaptor {
                     public void optionsChanged(OptionsParam optionsParam) {
                         if (options.hasCommsChanged(prevOptions)) {
                             commsServices.clear();
-                            prevOptions = (LlmOptions) options.clone();
+                            prevOptions = options.clone();
                         }
                     }
                 });
 
         if (hasView()) {
-            extensionHook.getHookView().addOptionPanel(new LlmOptionsPanel());
+            ExtensionHookView hookView = extensionHook.getHookView();
+            hookView.addOptionPanel(new LlmOptionsPanel());
+            hookView.addMainToolBarComponent(getProviderSelectorButton());
         }
     }
 
@@ -114,7 +134,7 @@ public class ExtensionLlm extends ExtensionAdaptor {
 
     @Override
     public void optionsLoaded() {
-        this.prevOptions = (LlmOptions) this.options.clone();
+        this.prevOptions = this.options.clone();
     }
 
     public LlmCommunicationService getCommunicationService(String commsKey, String outputTabName) {
@@ -123,5 +143,83 @@ public class ExtensionLlm extends ExtensionAdaptor {
         }
         return commsServices.computeIfAbsent(
                 commsKey, k -> new LlmCommunicationService(options, outputTabName));
+    }
+
+    private JButton getProviderSelectorButton() {
+        if (providerSelectorButton == null) {
+            providerSelectorButton = new JButton();
+            ImageIcon icon = getImageIcon(TOOLBAR_ICON_RESOURCE);
+            if (icon == null) {
+                icon = getImageIcon(TOOLBAR_ICON_FALLBACK);
+            }
+            if (icon != null) {
+                providerSelectorButton.setIcon(icon);
+            }
+            providerSelectorButton.setToolTipText(
+                    Constant.messages.getString("llm.toolbar.button.tooltip"));
+            providerSelectorButton.addActionListener(
+                    e -> showProvidersPopup(providerSelectorButton));
+        }
+        return providerSelectorButton;
+    }
+
+    private void showProvidersPopup(JButton invoker) {
+        JPopupMenu menu = buildProvidersMenu();
+        menu.show(invoker, 0, invoker.getHeight());
+    }
+
+    private JPopupMenu buildProvidersMenu() {
+        JPopupMenu menu = new JPopupMenu();
+        List<LlmProviderConfig> configs = options.getProviderConfigs();
+        if (configs.isEmpty()) {
+            JMenuItem empty =
+                    new JMenuItem(
+                            Constant.messages.getString("llm.toolbar.providers.none"));
+            empty.setEnabled(false);
+            menu.add(empty);
+            return menu;
+        }
+
+        String defaultName = options.getDefaultProviderName();
+        ButtonGroup group = new ButtonGroup();
+        for (LlmProviderConfig config : configs) {
+            String name = config.getName();
+            boolean isDefault = name.equals(defaultName);
+            String label = name;
+            if (isDefault) {
+                label += Constant.messages.getString("llm.toolbar.default.suffix");
+            }
+            JRadioButtonMenuItem item = new JRadioButtonMenuItem(label, isDefault);
+            item.addActionListener(e -> setDefaultProvider(name));
+            group.add(item);
+            menu.add(item);
+        }
+        return menu;
+    }
+
+    private void setDefaultProvider(String name) {
+        if (name == null || name.equals(options.getDefaultProviderName())) {
+            return;
+        }
+
+        options.setDefaultProviderName(name);
+        try {
+            options.getConfig().save();
+        } catch (ConfigurationException e) {
+            LOGGER.error("Failed to save LLM default provider selection:", e);
+        }
+
+        if (options.hasCommsChanged(prevOptions)) {
+            commsServices.clear();
+            prevOptions = options.clone();
+        }
+    }
+
+    private static ImageIcon getImageIcon(String resourceName) {
+        URL icon = ExtensionLlm.class.getResource(resourceName);
+        if (icon == null) {
+            return null;
+        }
+        return new ImageIcon(icon);
     }
 }
