@@ -19,6 +19,7 @@
  */
 package org.zaproxy.zap.extension.selenium;
 
+import java.io.File;
 import java.lang.ref.WeakReference;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -54,6 +55,7 @@ import org.openqa.selenium.bidi.webextension.ExtensionPath;
 import org.openqa.selenium.bidi.webextension.InstallExtensionParameters;
 import org.openqa.selenium.bidi.webextension.WebExtension;
 import org.openqa.selenium.chrome.ChromeDriver;
+import org.openqa.selenium.chrome.ChromeDriverService;
 import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.chromium.ChromiumOptions;
 import org.openqa.selenium.edge.EdgeDriver;
@@ -61,6 +63,7 @@ import org.openqa.selenium.edge.EdgeOptions;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxOptions;
 import org.openqa.selenium.firefox.FirefoxProfile;
+import org.openqa.selenium.firefox.GeckoDriverService;
 import org.openqa.selenium.firefox.ProfilesIni;
 import org.openqa.selenium.htmlunit.HtmlUnitDriver;
 import org.openqa.selenium.remote.CapabilityType;
@@ -81,8 +84,11 @@ import org.zaproxy.zap.extension.AddonFilesChangedListener;
 import org.zaproxy.zap.extension.script.ExtensionScript;
 import org.zaproxy.zap.extension.script.ScriptType;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
+import org.zaproxy.zap.extension.selenium.DriverConfiguration.DriverType;
 import org.zaproxy.zap.extension.selenium.internal.BrowserArgument;
 import org.zaproxy.zap.extension.selenium.internal.BuiltInSingleWebDriverProvider;
+import org.zaproxy.zap.extension.selenium.internal.CustomBrowserImpl;
+import org.zaproxy.zap.extension.selenium.internal.CustomBrowserWebDriverProvider;
 import org.zaproxy.zap.extension.selenium.internal.FirefoxProfileManager;
 import org.zaproxy.zap.utils.Stats;
 
@@ -230,10 +236,34 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         addBuiltInProvider(Browser.FIREFOX);
         addBuiltInProvider(Browser.FIREFOX_HEADLESS);
         addBuiltInProvider(Browser.HTML_UNIT);
-        addBuiltInProvider(Browser.SAFARI);
+        // Safari disabled as it appears not to support proxying
+        // addBuiltInProvider(Browser.SAFARI);
 
         providedBrowserUIList = new ArrayList<>();
         buildProvidedBrowserUIList();
+    }
+
+    /**
+     * Registers custom browsers as WebDriver providers. This should be called after options are
+     * loaded or when custom browsers are added/removed.
+     */
+    protected void registerCustomBrowsers() {
+        // Remove existing custom browser providers
+        List<SingleWebDriverProvider> toRemove =
+                webDriverProviders.values().stream()
+                        .filter(SingleWebDriverProvider::isCustom)
+                        .toList();
+        toRemove.forEach(p -> removeWebDriverProvider(p));
+
+        // Register new custom browsers (both regular and headless versions)
+        for (CustomBrowserImpl customBrowser : getOptions().getCustomBrowsers()) {
+            try {
+                addWebDriverProvider(new CustomBrowserWebDriverProvider(customBrowser, false));
+                addWebDriverProvider(new CustomBrowserWebDriverProvider(customBrowser, true));
+            } catch (Exception e) {
+                LOGGER.warn("Failed to register custom browser: {}", customBrowser.getName(), e);
+            }
+        }
     }
 
     private void addBuiltInProvider(Browser browser) {
@@ -289,6 +319,11 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         return new ImageIcon(
                 ExtensionSelenium.class.getResource(
                         "/org/zaproxy/zap/extension/selenium/resources/script-selenium.png"));
+    }
+
+    @Override
+    public void optionsLoaded() {
+        registerCustomBrowsers();
     }
 
     @Override
@@ -570,7 +605,9 @@ public class ExtensionSelenium extends ExtensionAdaptor {
     }
 
     public WebDriver getWebDriver(int requester, String providedBrowserId) {
-        return getWebDriver(requester, providedBrowserId, true);
+        return getWebDriver(
+                providedBrowserId,
+                DriverConfiguration.builder().requester(requester).enableExtensions(true).build());
     }
 
     /**
@@ -585,12 +622,24 @@ public class ExtensionSelenium extends ExtensionAdaptor {
      */
     public WebDriver getWebDriver(
             int requester, String providedBrowserId, boolean enableExtensions) {
-        return getWebDriverImpl(requester, providedBrowserId, null, -1, enableExtensions);
+        return getWebDriver(
+                providedBrowserId,
+                DriverConfiguration.builder()
+                        .requester(requester)
+                        .enableExtensions(enableExtensions)
+                        .build());
     }
 
     public WebDriver getWebDriver(
             int requester, String providedBrowserId, String proxyAddress, int proxyPort) {
-        return this.getWebDriver(requester, providedBrowserId, proxyAddress, proxyPort, true);
+        return getWebDriver(
+                providedBrowserId,
+                DriverConfiguration.builder()
+                        .requester(requester)
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .enableExtensions(true)
+                        .build());
     }
 
     /**
@@ -615,10 +664,15 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             String proxyAddress,
             int proxyPort,
             boolean enableExtensions) {
-        validateProxyAddressPort(proxyAddress, proxyPort);
-
-        return getWebDriverImpl(
-                requester, providedBrowserId, proxyAddress, proxyPort, enableExtensions);
+        return getWebDriver(
+                providedBrowserId,
+                DriverConfiguration.builder()
+                        .type(browserToType(Browser.getBrowserWithId(providedBrowserId)))
+                        .requester(requester)
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .enableExtensions(enableExtensions)
+                        .build());
     }
 
     public WebDriver getWebDriverProxyingViaZAP(int requester, String providedBrowserId) {
@@ -635,12 +689,15 @@ public class ExtensionSelenium extends ExtensionAdaptor {
     public WebDriver getWebDriverProxyingViaZAP(
             int requester, String providedBrowserId, boolean enableExtensions) {
         ServerInfo serverInfo = getExtensionNetwork().getMainProxyServerInfo();
-        return this.getWebDriver(
-                requester,
+        return getWebDriver(
                 providedBrowserId,
-                serverInfo.getAddress(),
-                serverInfo.getPort(),
-                enableExtensions);
+                DriverConfiguration.builder()
+                        .type(browserToType(Browser.getBrowserWithId(providedBrowserId)))
+                        .requester(requester)
+                        .proxyAddress(serverInfo.getAddress())
+                        .proxyPort(serverInfo.getPort())
+                        .enableExtensions(enableExtensions)
+                        .build());
     }
 
     private ExtensionNetwork getExtensionNetwork() {
@@ -799,29 +856,81 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         }
     }
 
-    private WebDriver getWebDriverImpl(
-            int requester,
-            String providedBrowserId,
-            String proxyAddress,
-            int proxyPort,
-            boolean enableExtensions) {
-        ProvidedBrowser providedBrowser = getProvidedBrowser(providedBrowserId);
-        if (providedBrowser == null) {
-            throw new IllegalArgumentException("Unknown browser: " + providedBrowserId);
+    /**
+     * Gets a {@code WebDriver} for the given browser ID and driver configuration.
+     *
+     * <p>Handles both built-in browsers (Chrome, Edge, Firefox) and custom browsers. The {@code
+     * browserId} is the provided browser ID (e.g. {@code "chrome"}, {@code "firefox"}, {@code
+     * "custom.MyBrowser"}, {@code "custom.MyBrowser-headless"}).
+     *
+     * @param browserId the ID of the provided browser (built-in or custom).
+     * @param driverConf the driver configuration (e.g. proxy, requester). May be {@code null} to
+     *     use defaults.
+     * @return the {@code WebDriver} for the given browser.
+     * @throws IllegalArgumentException if the browser ID is unknown, or if proxy is invalid when
+     *     set.
+     */
+    public WebDriver getWebDriver(String browserId, DriverConfiguration driverConf) {
+        if (driverConf.getProxyAddress() != null) {
+            validateProxyAddressPort(driverConf.getProxyAddress(), driverConf.getProxyPort());
+        }
+        ProvidedBrowser provided = getProvidedBrowser(browserId);
+        if (provided == null) {
+            throw new IllegalArgumentException("Unknown browser: " + browserId);
+        }
+        SingleWebDriverProvider provider = webDriverProviders.get(provided.getProviderId());
+        if (provider == null) {
+            throw new IllegalArgumentException("Unknown browser: " + browserId);
+        }
+        Consumer<MutableCapabilities> consumer =
+                driverConf.getConsumer() != null ? driverConf.getConsumer() : c -> {};
+        int requester = driverConf.getRequester();
+        String proxyAddress = driverConf.getProxyAddress();
+        int proxyPort = driverConf.getProxyPort();
+        boolean enableExtensions = driverConf.isEnableExtensions();
+        WebDriver wd;
+        DriverConfiguration config;
+        String statsKey;
+
+        if (provider instanceof BuiltInSingleWebDriverProvider builtinBrowserProv) {
+            Browser browser = builtinBrowserProv.getBrowser();
+            statsKey = "stats.selenium.launch." + requester + "." + browser.getId();
+            config =
+                    buildConfigFromBrowser(
+                            browser,
+                            requester,
+                            proxyAddress,
+                            proxyPort,
+                            consumer,
+                            enableExtensions);
+        } else if (provider instanceof CustomBrowserWebDriverProvider customBrowserProv) {
+            CustomBrowserImpl customBrowser = customBrowserProv.getCustomBrowser();
+            boolean headless = browserId.endsWith("-headless");
+            statsKey = "stats.selenium.launch." + requester + ".custom." + customBrowser.getName();
+            config =
+                    buildConfigFromCustomBrowser(
+                            customBrowser,
+                            requester,
+                            proxyAddress,
+                            proxyPort,
+                            headless,
+                            consumer,
+                            enableExtensions);
+        } else {
+            throw new IllegalArgumentException(
+                    "Unknown ProvidedBrowser: " + provided.getClass().getCanonicalName());
         }
 
-        WebDriver wd;
-        if (proxyAddress == null) {
-            wd = webDriverProviders.get(providedBrowser.getProviderId()).getWebDriver(requester);
-        } else {
-            wd =
-                    webDriverProviders
-                            .get(providedBrowser.getProviderId())
-                            .getWebDriver(requester, proxyAddress, proxyPort, enableExtensions);
+        try {
+            wd = createWebDriver(config);
+            Stats.incCounter(statsKey);
+        } catch (Exception e) {
+            Stats.incCounter(statsKey + ".failure");
+            throw e;
         }
 
         SeleniumScriptUtils ssu =
-                new SeleniumScriptUtils(wd, requester, providedBrowserId, proxyAddress, proxyPort);
+                new SeleniumScriptUtils(wd, requester, browserId, proxyAddress, proxyPort);
 
         // Run any hooks registered by add-ons first
         browserHooks.forEach(
@@ -880,7 +989,7 @@ public class ExtensionSelenium extends ExtensionAdaptor {
      * @see #getWebDriver(Browser, String, int)
      */
     public static WebDriver getWebDriver(Browser browser) {
-        return getWebDriver(-1, browser);
+        return getWebDriverViaExtension(browser.getId(), DriverConfiguration.builder().build());
     }
 
     /**
@@ -892,7 +1001,8 @@ public class ExtensionSelenium extends ExtensionAdaptor {
      * @see #getWebDriver(Browser)
      */
     public static WebDriver getWebDriver(int requester, Browser browser) {
-        return getWebDriver(requester, browser, null, -1);
+        return getWebDriverViaExtension(
+                browser.getId(), DriverConfiguration.builder().requester(requester).build());
     }
 
     /**
@@ -909,7 +1019,13 @@ public class ExtensionSelenium extends ExtensionAdaptor {
      * @see #getWebDriver(Browser)
      */
     public static WebDriver getWebDriver(Browser browser, String proxyAddress, int proxyPort) {
-        return getWebDriver(-1, browser, proxyAddress, proxyPort);
+        return getWebDriverViaExtension(
+                browser.getId(),
+                DriverConfiguration.builder()
+                        .type(browserToType(browser))
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .build());
     }
 
     /**
@@ -928,7 +1044,14 @@ public class ExtensionSelenium extends ExtensionAdaptor {
      */
     public static WebDriver getWebDriver(
             int requester, Browser browser, String proxyAddress, int proxyPort) {
-        return getWebDriver(requester, browser, proxyAddress, proxyPort, false);
+        return getWebDriverViaExtension(
+                browser.getId(),
+                DriverConfiguration.builder()
+                        .requester(requester)
+                        .type(browserToType(browser))
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .build());
     }
 
     public static WebDriver getWebDriver(
@@ -937,7 +1060,15 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             String proxyAddress,
             int proxyPort,
             boolean enableExtensions) {
-        return getWebDriver(requester, browser, proxyAddress, proxyPort, c -> {}, enableExtensions);
+        return getWebDriverViaExtension(
+                browser.getId(),
+                DriverConfiguration.builder()
+                        .requester(requester)
+                        .type(browserToType(browser))
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .enableExtensions(enableExtensions)
+                        .build());
     }
 
     public static WebDriver getWebDriver(
@@ -945,7 +1076,14 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             String proxyAddress,
             int proxyPort,
             Consumer<MutableCapabilities> consumer) {
-        return getWebDriver(browser, proxyAddress, proxyPort, consumer, false);
+        return getWebDriverViaExtension(
+                browser.getId(),
+                DriverConfiguration.builder()
+                        .type(browserToType(browser))
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .consumer(consumer)
+                        .build());
     }
 
     public static WebDriver getWebDriver(
@@ -954,7 +1092,15 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             int proxyPort,
             Consumer<MutableCapabilities> consumer,
             boolean enableExtensions) {
-        return getWebDriver(-1, browser, proxyAddress, proxyPort, consumer, enableExtensions);
+        return getWebDriverViaExtension(
+                browser.getId(),
+                DriverConfiguration.builder()
+                        .type(browserToType(browser))
+                        .proxyAddress(proxyAddress)
+                        .proxyPort(proxyPort)
+                        .consumer(consumer)
+                        .enableExtensions(enableExtensions)
+                        .build());
     }
 
     public static WebDriver getWebDriver(
@@ -964,35 +1110,231 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             int proxyPort,
             Consumer<MutableCapabilities> consumer,
             boolean enableExtensions) {
-        validateProxyAddressPort(proxyAddress, proxyPort);
-
-        WebDriver wd;
-        try {
-            wd =
-                    getWebDriverImpl(
-                            requester,
-                            browser,
-                            proxyAddress,
-                            proxyPort,
-                            consumer,
-                            enableExtensions);
-            updateLaunchStats(requester, browser, true);
-        } catch (Exception e) {
-            updateLaunchStats(requester, browser, false);
-            throw e;
+        var builder =
+                DriverConfiguration.builder()
+                        .type(browserToType(browser))
+                        .requester(requester)
+                        .consumer(consumer)
+                        .enableExtensions(enableExtensions);
+        if (proxyAddress != null) {
+            builder.proxyAddress(proxyAddress).proxyPort(proxyPort);
         }
-        webDrivers.add(wd);
-        return wd;
+        return getWebDriverViaExtension(browser.getId(), builder.build());
     }
 
-    private static void updateLaunchStats(int requester, Browser browser, boolean success) {
-        String key = "stats.selenium.launch." + requester + "." + browser.getId();
-        if (success) {
-            Stats.incCounter("stats.selenium.launch." + browser.getId());
-        } else {
-            key += ".failure";
+    /**
+     * Gets a {@code WebDriver} for the given browser ID and driver configuration by resolving the
+     * extension and delegating to {@link #getWebDriver(String, DriverConfiguration)}. Used by
+     * static delegating methods in this class.
+     */
+    private static WebDriver getWebDriverViaExtension(
+            String browserId, DriverConfiguration driverConf) {
+        ExtensionSelenium extension =
+                Control.getSingleton().getExtensionLoader().getExtension(ExtensionSelenium.class);
+        if (extension == null) {
+            throw new IllegalStateException("Selenium extension is not loaded.");
         }
-        Stats.incCounter(key);
+        DriverConfiguration conf =
+                driverConf != null ? driverConf : DriverConfiguration.builder().build();
+        return extension.getWebDriver(browserId, conf);
+    }
+
+    private static WebDriver createWebDriver(DriverConfiguration conf) {
+        switch (conf.getType()) {
+            case CHROMIUM:
+            case EDGE:
+                boolean isEdge = DriverType.EDGE.equals(conf.getType());
+                ChromiumOptions<?> chromiumOptions =
+                        isEdge ? new EdgeOptions() : new ChromeOptions();
+                configureChromiumOptions(
+                        chromiumOptions,
+                        conf.getProxyAddress(),
+                        conf.getProxyPort(),
+                        conf.isHeadless(),
+                        conf.getBinaryPath(),
+                        conf.getArguments());
+                conf.getConsumer().accept(chromiumOptions);
+
+                if (isEdge) {
+                    return configureDriver(
+                            Browser.EDGE,
+                            new EdgeDriver((EdgeOptions) chromiumOptions),
+                            conf.isEnableExtensions());
+                }
+                ChromeDriver chromeDriver;
+                if (StringUtils.isNotEmpty(conf.getDriverPath())) {
+                    ChromeDriverService chromeService =
+                            new ChromeDriverService.Builder()
+                                    .usingDriverExecutable(new File(conf.getDriverPath()))
+                                    .build();
+                    chromeDriver = new ChromeDriver(chromeService, (ChromeOptions) chromiumOptions);
+                } else {
+                    chromeDriver = new ChromeDriver((ChromeOptions) chromiumOptions);
+                }
+                return configureDriver(Browser.CHROME, chromeDriver, conf.isEnableExtensions());
+
+            case FIREFOX:
+                FirefoxOptions firefoxOptions = new FirefoxOptions();
+                configureFirefoxOptions(
+                        firefoxOptions,
+                        conf.getProxyAddress(),
+                        conf.getProxyPort(),
+                        conf.getRequester(),
+                        conf.isHeadless(),
+                        conf.getBinaryPath(),
+                        conf.getArguments());
+                addFirefoxArguments(firefoxOptions);
+                conf.getConsumer().accept(firefoxOptions);
+
+                String fxProfile = getSeleniumOptions().getFirefoxDefaultProfile();
+                if (!StringUtils.isEmpty(fxProfile)) {
+                    ProfilesIni pi = new ProfilesIni();
+                    try {
+                        FirefoxProfile firefoxProfile = pi.getProfile(fxProfile);
+                        firefoxOptions.setProfile(firefoxProfile);
+                    } catch (Exception e) {
+                        LOGGER.error(e.getMessage(), e);
+                    }
+                }
+
+                FirefoxDriver firefoxDriver;
+                if (StringUtils.isNotEmpty(conf.getDriverPath())) {
+                    GeckoDriverService geckoService =
+                            new GeckoDriverService.Builder()
+                                    .usingDriverExecutable(new File(conf.getDriverPath()))
+                                    .build();
+                    firefoxDriver = new FirefoxDriver(geckoService, firefoxOptions);
+                } else {
+                    firefoxDriver = new FirefoxDriver(firefoxOptions);
+                }
+                return configureDriver(Browser.FIREFOX, firefoxDriver, conf.isEnableExtensions());
+
+            case HTML_UNIT:
+                DesiredCapabilities htmlunitCapabilities = new DesiredCapabilities();
+                setCommonOptions(htmlunitCapabilities, conf.getProxyAddress(), conf.getProxyPort());
+                htmlunitCapabilities.setBrowserName(
+                        org.openqa.selenium.remote.Browser.HTMLUNIT.browserName());
+                conf.getConsumer().accept(htmlunitCapabilities);
+                return new HtmlUnitDriver(htmlunitCapabilities);
+
+            case SAFARI:
+                SafariOptions safariOptions = new SafariOptions();
+                setCommonOptions(safariOptions, conf.getProxyAddress(), conf.getProxyPort());
+                conf.getConsumer().accept(safariOptions);
+                return new SafariDriver(safariOptions);
+
+            default:
+                throw new WebDriverException("No longer supported.");
+        }
+    }
+
+    private static DriverType browserToType(Browser browser) {
+        return switch (browser) {
+            case CHROME -> DriverConfiguration.DriverType.CHROMIUM;
+            case CHROME_HEADLESS -> DriverConfiguration.DriverType.CHROMIUM;
+            case EDGE -> DriverConfiguration.DriverType.EDGE;
+            case EDGE_HEADLESS -> DriverConfiguration.DriverType.EDGE;
+            case FIREFOX -> DriverConfiguration.DriverType.FIREFOX;
+            case FIREFOX_HEADLESS -> DriverConfiguration.DriverType.FIREFOX;
+            case HTML_UNIT -> DriverConfiguration.DriverType.HTML_UNIT;
+            case SAFARI -> DriverConfiguration.DriverType.SAFARI;
+            default -> null;
+        };
+    }
+
+    private static DriverConfiguration buildConfigFromBrowser(
+            Browser browser,
+            int requester,
+            String proxyAddress,
+            int proxyPort,
+            Consumer<MutableCapabilities> consumer,
+            boolean enableExtensions) {
+        boolean headless =
+                browser == Browser.CHROME_HEADLESS
+                        || browser == Browser.EDGE_HEADLESS
+                        || browser == Browser.FIREFOX_HEADLESS;
+        String binaryPath = System.getProperty(SeleniumOptions.CHROME_BINARY_SYSTEM_PROPERTY);
+        if (browser == Browser.EDGE || browser == Browser.EDGE_HEADLESS) {
+            binaryPath = System.getProperty(SeleniumOptions.EDGE_BINARY_SYSTEM_PROPERTY);
+        } else if (browser == Browser.FIREFOX || browser == Browser.FIREFOX_HEADLESS) {
+            binaryPath = System.getProperty(SeleniumOptions.FIREFOX_BINARY_SYSTEM_PROPERTY);
+        }
+
+        List<String> arguments = new ArrayList<>();
+        if (browser == Browser.CHROME
+                || browser == Browser.CHROME_HEADLESS
+                || browser == Browser.EDGE
+                || browser == Browser.EDGE_HEADLESS) {
+            getSeleniumOptions().getBrowserArguments(browser.getId()).stream()
+                    .filter(BrowserArgument::isEnabled)
+                    .map(BrowserArgument::getArgument)
+                    .forEach(arguments::add);
+        }
+
+        return DriverConfiguration.builder()
+                .requester(requester)
+                .type(browserToType(browser))
+                .proxyAddress(proxyAddress)
+                .proxyPort(proxyPort)
+                .headless(headless)
+                .binaryPath(binaryPath)
+                .driverPath("")
+                .arguments(arguments)
+                .consumer(consumer)
+                .enableExtensions(enableExtensions)
+                .build();
+    }
+
+    private static DriverConfiguration buildConfigFromCustomBrowser(
+            CustomBrowserImpl customBrowser,
+            int requester,
+            String proxyAddress,
+            int proxyPort,
+            boolean headless,
+            Consumer<MutableCapabilities> consumer,
+            boolean enableExtensions) {
+        List<String> arguments = getCustomBrowserArguments(customBrowser);
+        String binaryPath;
+        String driverPath;
+        DriverType type;
+
+        switch (customBrowser.getBrowserType()) {
+            case CHROMIUM:
+                type = DriverType.CHROMIUM;
+                binaryPath =
+                        StringUtils.isNotEmpty(customBrowser.getBinaryPath())
+                                ? customBrowser.getBinaryPath()
+                                : getSeleniumOptions().getChromeBinaryPath();
+                driverPath = getEffectiveChromiumDriverPath(customBrowser);
+                break;
+            case FIREFOX:
+                type = DriverType.FIREFOX;
+                binaryPath =
+                        StringUtils.isNotEmpty(customBrowser.getBinaryPath())
+                                ? customBrowser.getBinaryPath()
+                                : getSeleniumOptions().getFirefoxBinaryPath();
+                driverPath = getEffectiveFirefoxDriverPath(customBrowser);
+                break;
+            default:
+                throw new IllegalArgumentException(
+                        "Custom browser type is not supported: "
+                                + customBrowser.getBrowserType()
+                                + " for browser: "
+                                + customBrowser.getName());
+        }
+
+        return DriverConfiguration.builder()
+                .requester(requester)
+                .type(type)
+                .proxyAddress(proxyAddress)
+                .proxyPort(proxyPort)
+                .headless(headless)
+                .binaryPath(binaryPath)
+                .driverPath(driverPath != null ? driverPath : "")
+                .arguments(arguments)
+                .consumer(consumer)
+                .enableExtensions(enableExtensions)
+                .build();
     }
 
     private static void setCommonOptions(
@@ -1023,174 +1365,161 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         }
     }
 
-    private static void addArguments(Browser browser, ChromiumOptions<?> options) {
-        List<String> arguments = new ArrayList<>();
+    private static void configureChromiumOptions(
+            ChromiumOptions<?> options,
+            String proxyAddress,
+            int proxyPort,
+            boolean headless,
+            String binaryPath,
+            List<String> customArguments) {
+        options.setCapability(BIDI_CAPABILITIY, true);
+        setCommonOptions(options, proxyAddress, proxyPort);
+        options.addArguments("--proxy-bypass-list=<-loopback>");
+        options.addArguments("--ignore-certificate-errors");
         // Needed to load the extensions.
-        arguments.add("--enable-unsafe-extension-debugging");
-        arguments.add("--remote-debugging-pipe");
-        getSeleniumOptions().getBrowserArguments(browser.getId()).stream()
+        options.addArguments("--remote-debugging-pipe");
+        options.addArguments("--enable-unsafe-extension-debugging");
+
+        if (customArguments != null) {
+            options.addArguments(customArguments);
+        }
+
+        if (headless) {
+            options.addArguments("--headless=new");
+        }
+
+        if (StringUtils.isNotEmpty(binaryPath)) {
+            options.setBinary(binaryPath);
+        }
+    }
+
+    private static void configureFirefoxOptions(
+            FirefoxOptions options,
+            String proxyAddress,
+            int proxyPort,
+            int requester,
+            boolean headless,
+            String binaryPath,
+            List<String> customArguments) {
+        options.setCapability(BIDI_CAPABILITIY, true);
+        setCommonOptions(options, proxyAddress, proxyPort);
+
+        if (binaryPath != null && !binaryPath.isEmpty()) {
+            options.setBinary(binaryPath);
+        }
+
+        // Keep proxying localhost on Firefox >= 67
+        options.addPreference("network.proxy.allow_hijacking_localhost", true);
+        // Ensure ServiceWorkers are enabled for the HUD.
+        options.addPreference("dom.serviceWorkers.enabled", true);
+        // Disable the captive checks/requests, mainly to avoid flooding
+        // the AJAX Spider results (those requests are out of scope) but
+        // also useful for other launched browsers.
+        options.addPreference("network.captive-portal-service.enabled", false);
+
+        if (requester == HttpSender.AJAX_SPIDER_INITIATOR
+                || requester == HttpSender.ACTIVE_SCANNER_INITIATOR) {
+            // Disable JSON viewer, otherwise AJAX Spider or scan rules will use it,
+            // potentially invoking the "Save As" dialog which will hang waiting for the
+            // user to click on a button.
+            // https://developer.mozilla.org/en-US/docs/Tools/JSON_viewer
+            options.addPreference("devtools.jsonview.enabled", false);
+        }
+
+        if (proxyAddress != null) {
+            // Some issues prevent the PROXY capability from being properly applied:
+            // https://bugzilla.mozilla.org/show_bug.cgi?id=1282873
+            // https://bugzilla.mozilla.org/show_bug.cgi?id=1369827
+            // For now set the preferences manually:
+            options.addPreference("network.proxy.type", 1);
+            options.addPreference("network.proxy.http", proxyAddress);
+            options.addPreference("network.proxy.http_port", proxyPort);
+            options.addPreference("network.proxy.ssl", proxyAddress);
+            options.addPreference("network.proxy.ssl_port", proxyPort);
+            options.addPreference("network.proxy.share_proxy_settings", true);
+            options.addPreference("network.proxy.no_proxies_on", "");
+            // Fixes a problem with the HUD
+            options.addPreference("browser.tabs.documentchannel", false);
+            // And remove the PROXY capability:
+            options.setCapability(CapabilityType.PROXY, (Object) null);
+        }
+
+        if (headless) {
+            options.addArguments("-headless");
+        }
+
+        if (!customArguments.isEmpty()) {
+            options.addArguments(customArguments);
+        }
+    }
+
+    /**
+     * Extracts enabled custom browser arguments from a CustomBrowser.
+     *
+     * @param customBrowser the custom browser
+     * @return list of enabled argument strings
+     */
+    private static List<String> getCustomBrowserArguments(CustomBrowserImpl customBrowser) {
+        return customBrowser.getArguments().stream()
                 .filter(BrowserArgument::isEnabled)
                 .map(BrowserArgument::getArgument)
-                .forEach(arguments::add);
-        if (!arguments.isEmpty()) {
-            options.addArguments(arguments);
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Returns the driver path to use for a custom Chromium browser: the custom browser's path if
+     * set, otherwise the default Chrome driver path from options or bundled.
+     */
+    private static String getEffectiveChromiumDriverPath(CustomBrowserImpl customBrowser) {
+        if (StringUtils.isNotEmpty(customBrowser.getDriverPath())) {
+            return customBrowser.getDriverPath();
         }
+        String path = getSeleniumOptions().getChromeDriverPath();
+        if (StringUtils.isNotEmpty(path)) {
+            return path;
+        }
+        path = Browser.getBundledWebDriverPath(Browser.CHROME);
+        return path != null ? path : "";
+    }
+
+    /**
+     * Returns the driver path to use for a custom Firefox browser: the custom browser's path if
+     * set, otherwise the default Firefox driver path from options or bundled.
+     */
+    private static String getEffectiveFirefoxDriverPath(CustomBrowserImpl customBrowser) {
+        if (StringUtils.isNotEmpty(customBrowser.getDriverPath())) {
+            return customBrowser.getDriverPath();
+        }
+        String path = getSeleniumOptions().getFirefoxDriverPath();
+        if (StringUtils.isNotEmpty(path)) {
+            return path;
+        }
+        path = Browser.getBundledWebDriverPath(Browser.FIREFOX);
+        return path != null ? path : "";
     }
 
     private static RemoteWebDriver configureDriver(
             Browser browser, RemoteWebDriver driver, boolean enableExtensions) {
         driver.script().addConsoleMessageHandler(e -> WEBDRIVER_LOGGER.debug(e.getText()));
-
         if (enableExtensions) {
             WebExtension webExt = new WebExtension(driver);
-            getSeleniumOptions().getEnabledBrowserExtensions(browser).stream()
+            boolean isChromium =
+                    browser == Browser.CHROME
+                            || browser == Browser.CHROME_HEADLESS
+                            || browser == Browser.EDGE
+                            || browser == Browser.EDGE_HEADLESS;
+            getSeleniumOptions()
+                    .getEnabledBrowserExtensions(isChromium ? Browser.CHROME : browser)
+                    .stream()
                     .map(BrowserExtension::getPath)
                     .map(Path::toAbsolutePath)
                     .map(Path::toString)
-                    .map(browser == Browser.CHROME ? ExtensionPath::new : ExtensionArchivePath::new)
+                    .map(isChromium ? ExtensionPath::new : ExtensionArchivePath::new)
                     .map(InstallExtensionParameters::new)
                     .forEach(webExt::install);
         }
 
         return driver;
-    }
-
-    private static WebDriver getWebDriverImpl(
-            int requester,
-            Browser browser,
-            String proxyAddress,
-            int proxyPort,
-            Consumer<MutableCapabilities> consumer,
-            boolean enableExtensions) {
-        switch (browser) {
-            case CHROME:
-            case CHROME_HEADLESS:
-                ChromeOptions chromeOptions = new ChromeOptions();
-                chromeOptions.setCapability(BIDI_CAPABILITIY, true);
-                setCommonOptions(chromeOptions, proxyAddress, proxyPort);
-                chromeOptions.addArguments("--proxy-bypass-list=<-loopback>");
-                chromeOptions.addArguments("--ignore-certificate-errors");
-                if (browser == Browser.CHROME_HEADLESS) {
-                    chromeOptions.addArguments("--headless=new");
-                }
-                String binary = System.getProperty(SeleniumOptions.CHROME_BINARY_SYSTEM_PROPERTY);
-                if (binary != null && !binary.isEmpty()) {
-                    chromeOptions.setBinary(binary);
-                }
-
-                addArguments(Browser.CHROME, chromeOptions);
-                consumer.accept(chromeOptions);
-                return configureDriver(
-                        Browser.CHROME, new ChromeDriver(chromeOptions), enableExtensions);
-            case EDGE, EDGE_HEADLESS:
-                EdgeOptions edgeOptions = new EdgeOptions();
-                edgeOptions.setCapability(BIDI_CAPABILITIY, true);
-                setCommonOptions(edgeOptions, proxyAddress, proxyPort);
-                edgeOptions.addArguments("--proxy-bypass-list=<-loopback>");
-                edgeOptions.addArguments("--ignore-certificate-errors");
-                if (browser == Browser.EDGE_HEADLESS) {
-                    edgeOptions.addArguments("--headless=new");
-                }
-                String edgeBinary = System.getProperty(SeleniumOptions.EDGE_BINARY_SYSTEM_PROPERTY);
-                if (edgeBinary != null && !edgeBinary.isEmpty()) {
-                    edgeOptions.setBinary(edgeBinary);
-                }
-
-                addArguments(Browser.EDGE, edgeOptions);
-                consumer.accept(edgeOptions);
-                return configureDriver(
-                        Browser.CHROME, new EdgeDriver(edgeOptions), enableExtensions);
-            case FIREFOX:
-            case FIREFOX_HEADLESS:
-                FirefoxOptions firefoxOptions = new FirefoxOptions();
-                firefoxOptions.setCapability(BIDI_CAPABILITIY, true);
-                setCommonOptions(firefoxOptions, proxyAddress, proxyPort);
-
-                String binaryPath =
-                        System.getProperty(SeleniumOptions.FIREFOX_BINARY_SYSTEM_PROPERTY);
-                if (binaryPath != null && !binaryPath.isEmpty()) {
-                    firefoxOptions.setBinary(binaryPath);
-                }
-
-                // Keep proxying localhost on Firefox >= 67
-                firefoxOptions.addPreference("network.proxy.allow_hijacking_localhost", true);
-
-                // Ensure ServiceWorkers are enabled for the HUD.
-                firefoxOptions.addPreference("dom.serviceWorkers.enabled", true);
-
-                // Disable the captive checks/requests, mainly to avoid flooding
-                // the AJAX Spider results (those requests are out of scope) but
-                // also useful for other launched browsers.
-                firefoxOptions.addPreference("network.captive-portal-service.enabled", false);
-
-                if (requester == HttpSender.AJAX_SPIDER_INITIATOR
-                        || requester == HttpSender.ACTIVE_SCANNER_INITIATOR) {
-                    // Disable JSON viewer, otherwise AJAX Spider or scan rules will use it,
-                    // potentially invoking the "Save As" dialog which will hang waiting for the
-                    // user to click on a button.
-                    // https://developer.mozilla.org/en-US/docs/Tools/JSON_viewer
-                    firefoxOptions.addPreference("devtools.jsonview.enabled", false);
-                }
-
-                if (proxyAddress != null) {
-                    // Some issues prevent the PROXY capability from being properly applied:
-                    // https://bugzilla.mozilla.org/show_bug.cgi?id=1282873
-                    // https://bugzilla.mozilla.org/show_bug.cgi?id=1369827
-                    // For now set the preferences manually:
-                    firefoxOptions.addPreference("network.proxy.type", 1);
-                    firefoxOptions.addPreference("network.proxy.http", proxyAddress);
-                    firefoxOptions.addPreference("network.proxy.http_port", proxyPort);
-                    firefoxOptions.addPreference("network.proxy.ssl", proxyAddress);
-                    firefoxOptions.addPreference("network.proxy.ssl_port", proxyPort);
-                    firefoxOptions.addPreference("network.proxy.share_proxy_settings", true);
-                    firefoxOptions.addPreference("network.proxy.no_proxies_on", "");
-                    // Fixes a problem with the HUD
-                    firefoxOptions.addPreference("browser.tabs.documentchannel", false);
-                    // And remove the PROXY capability:
-                    firefoxOptions.setCapability(CapabilityType.PROXY, (Object) null);
-                }
-
-                if (browser == Browser.FIREFOX_HEADLESS) {
-                    firefoxOptions.addArguments("-headless");
-                }
-
-                addFirefoxArguments(firefoxOptions);
-                consumer.accept(firefoxOptions);
-
-                String fxProfile = getSeleniumOptions().getFirefoxDefaultProfile();
-                if (!StringUtils.isEmpty(fxProfile)) {
-                    ProfilesIni pi = new ProfilesIni();
-                    try {
-                        FirefoxProfile firefoxProfile = pi.getProfile(fxProfile);
-                        firefoxOptions.setProfile(firefoxProfile);
-                    } catch (Exception e) {
-                        LOGGER.error(e.getMessage(), e);
-                    }
-                }
-
-                return configureDriver(
-                        Browser.FIREFOX, new FirefoxDriver(firefoxOptions), enableExtensions);
-            case HTML_UNIT:
-                DesiredCapabilities htmlunitCapabilities = new DesiredCapabilities();
-                setCommonOptions(htmlunitCapabilities, proxyAddress, proxyPort);
-                htmlunitCapabilities.setBrowserName(
-                        org.openqa.selenium.remote.Browser.HTMLUNIT.browserName());
-
-                consumer.accept(htmlunitCapabilities);
-                return new HtmlUnitDriver(htmlunitCapabilities);
-            case INTERNET_EXPLORER:
-            case OPERA:
-            case PHANTOM_JS:
-                throw new WebDriverException("No longer supported.");
-            case SAFARI:
-                SafariOptions safariOptions = new SafariOptions();
-                setCommonOptions(safariOptions, proxyAddress, proxyPort);
-
-                consumer.accept(safariOptions);
-                return new SafariDriver(safariOptions);
-            default:
-                throw new IllegalArgumentException("Unknown browser: " + browser);
-        }
     }
 
     /**
@@ -1251,9 +1580,6 @@ public class ExtensionSelenium extends ExtensionAdaptor {
                 return getMessages().getString("selenium.warn.message.failed.start.browser.chrome");
             case EDGE:
                 return getMessages().getString("selenium.warn.message.failed.start.browser.edge");
-            case PHANTOM_JS:
-                return getMessages()
-                        .getString("selenium.warn.message.failed.start.browser.phantomjs");
             default:
                 return MessageFormat.format(
                         getMessages().getString("selenium.warn.message.failed.start.browser"),
@@ -1266,7 +1592,8 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         // No configurations, just install the browser or
         // browser plugins to work properly
         browsers.add(Browser.HTML_UNIT);
-        browsers.add(Browser.SAFARI);
+        // Safari disabled as it appears not to support proxying
+        // browsers.add(Browser.SAFARI);
         // Requires drivers, but hopefully they are already provided.
         browsers.add(Browser.CHROME);
         browsers.add(Browser.FIREFOX);
@@ -1329,12 +1656,10 @@ public class ExtensionSelenium extends ExtensionAdaptor {
      */
     public static boolean isConfigured(Browser browser) {
         switch (browser) {
-            case INTERNET_EXPLORER:
-            case OPERA:
-            case PHANTOM_JS:
-                return false;
             case SAFARI:
-                return Constant.isMacOsX();
+                // Disabled as it appears not to currently support proxying
+                // return Constant.isMacOsX();
+                return false;
             default:
                 // All the rest should work on all platforms
                 return true;
@@ -1387,5 +1712,33 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             throw new IllegalArgumentException("Firefox profile does not exist: " + profileName);
         }
         this.getOptions().setFirefoxDefaultProfile(profileName);
+    }
+
+    /**
+     * Add a custom browser
+     *
+     * @param browser the custom browser to add
+     * @since 15.44.0
+     */
+    public void addCustomBrowser(CustomBrowser browser) {
+        Objects.requireNonNull(browser);
+        Objects.requireNonNull(browser.getName());
+        Objects.requireNonNull(browser.getBrowserType());
+        this.getOptions().addCustomBrowser(new CustomBrowserImpl(browser));
+        registerCustomBrowsers();
+    }
+
+    /**
+     * Remove a custom browser
+     *
+     * @param name the name of the custom browser to remove
+     * @return true if the browser was removed
+     * @since 15.44.0
+     */
+    public boolean removeCustomBrowser(String name) {
+        Objects.requireNonNull(name);
+        boolean res = this.getOptions().removeCustomBrowser(name);
+        registerCustomBrowsers();
+        return res;
     }
 }

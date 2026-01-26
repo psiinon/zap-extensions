@@ -33,7 +33,6 @@ import fi.iki.elonen.NanoHTTPD.Response;
 import io.github.bonigarcia.wdm.WebDriverManager;
 import java.io.IOException;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
@@ -41,14 +40,12 @@ import org.hamcrest.Matchers;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.mockito.ArgumentMatchers;
 import org.mockito.quality.Strictness;
-import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.core.scanner.Alert;
 import org.parosproxy.paros.core.scanner.Plugin.AttackStrength;
@@ -63,11 +60,11 @@ import org.zaproxy.addon.commonlib.PolicyTag;
 import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.zap.extension.ascan.VariantFactory;
 import org.zaproxy.zap.extension.selenium.Browser;
+import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
 import org.zaproxy.zap.extension.selenium.SeleniumOptions;
 import org.zaproxy.zap.model.Context;
 import org.zaproxy.zap.testutils.ActiveScannerTestUtils;
 import org.zaproxy.zap.testutils.NanoServerHandler;
-import org.zaproxy.zap.utils.I18N;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
 
 class DomXssScanRuleUnitTest extends ActiveScannerTestUtils<DomXssScanRule> {
@@ -79,28 +76,8 @@ class DomXssScanRuleUnitTest extends ActiveScannerTestUtils<DomXssScanRule> {
 
     @BeforeAll
     static void setupAll() {
-        Constant.messages = new I18N(Locale.ROOT);
         WebDriverManager.firefoxdriver().setup();
         WebDriverManager.chromedriver().setup();
-    }
-
-    @BeforeEach
-    void setupEach() {
-        model = mock(Model.class, withSettings().strictness(Strictness.LENIENT));
-        Model.setSingletonForTesting(model);
-        given(model.getVariantFactory()).willReturn(new VariantFactory());
-        given(model.getOptionsParam()).willReturn(new OptionsParam());
-        extensionNetwork = new ExtensionNetwork();
-        extensionNetwork.initModel(model);
-        Control.initSingletonForTesting(model, mock(ExtensionLoader.class));
-        extensionNetwork.init();
-        extensionNetwork.hook(new ExtensionHook(model, null));
-
-        model.getOptionsParam().load(new ZapXmlConfiguration());
-        model.getOptionsParam().addParamSet(new SeleniumOptions());
-
-        session = new Session(model);
-        given(model.getSession()).willReturn(session);
     }
 
     @AfterEach
@@ -122,6 +99,32 @@ class DomXssScanRuleUnitTest extends ActiveScannerTestUtils<DomXssScanRule> {
 
     @Override
     protected DomXssScanRule createScanner() {
+        // Setup here so that the commonScanRuleTests get initialised correctly as well
+
+        mockMessages(new ExtensionDomXSS(), new ExtensionSelenium());
+        model = mock(Model.class, withSettings().strictness(Strictness.LENIENT));
+        Model.setSingletonForTesting(model);
+        given(model.getVariantFactory()).willReturn(new VariantFactory());
+        given(model.getOptionsParam()).willReturn(new OptionsParam());
+        extensionNetwork = new ExtensionNetwork();
+        extensionNetwork.initModel(model);
+        ExtensionLoader extensionLoader =
+                mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
+        Control.initSingletonForTesting(model, extensionLoader);
+
+        ExtensionSelenium extensionSelenium = new ExtensionSelenium();
+        given(extensionLoader.getExtension(ExtensionSelenium.class)).willReturn(extensionSelenium);
+        extensionSelenium.init();
+
+        extensionNetwork.init();
+        extensionNetwork.hook(new ExtensionHook(model, null));
+
+        model.getOptionsParam().load(new ZapXmlConfiguration());
+        model.getOptionsParam().addParamSet(new SeleniumOptions());
+
+        session = new Session(model);
+        given(model.getSession()).willReturn(session);
+
         DomXssScanRule.extensionNetwork = extensionNetwork;
         return new DomXssScanRule();
     }
