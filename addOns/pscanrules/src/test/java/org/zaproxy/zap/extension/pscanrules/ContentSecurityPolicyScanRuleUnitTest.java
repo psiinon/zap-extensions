@@ -21,6 +21,7 @@ package org.zaproxy.zap.extension.pscanrules;
 
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
@@ -401,53 +402,65 @@ class ContentSecurityPolicyScanRuleUnitTest
         assertThat(alertsRaised.size(), equalTo(0));
     }
 
-    @Test
-    void shouldAlertWithCspWarningNoticesWhenApplicableAndIgnoreTrustedTypes() {
+    @ParameterizedTest
+    @CsvSource(
+            value = {
+                "default-src 'self'; frame-ancestors 'none'; form-action 'none'; trusted-types | Empty trusted-types directive allows all policy names",
+                "default-src 'self'; frame-ancestors 'none'; form-action 'none'; require-trusted-types-for | The require-trusted-types-for directive requires a value"
+            },
+            delimiter = '|')
+    void shouldAlertWhenTrustedTypesDirectivesMissingValues(String policy, String expectedError) {
         // Given
-        String policy = "default-src none; report-to csp-endpoint; require-trusted-types 'script'";
         HttpMessage msg = createHttpMessage(policy);
         // When
         scanHttpResponseReceive(msg);
         // Then
-        assertThat(alertsRaised.size(), equalTo(2));
+        assertThat(alertsRaised.size(), equalTo(1));
+
         assertThat(alertsRaised.get(0).getName(), equalTo("CSP: Notices"));
-        assertThat(
-                alertsRaised.get(0).getOtherInfo(),
-                equalTo(
-                        "Warnings:\nThis host name is unusual, and likely meant to be a keyword that is missing the required quotes: 'none'.\n"));
+        assertThat(alertsRaised.get(0).getOtherInfo(), containsString(expectedError));
         assertThat(alertsRaised.get(0).getEvidence(), equalTo(policy));
         assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_LOW));
         assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_HIGH));
         assertThat(alertsRaised.get(0).getAlertRef(), equalTo("10055-3"));
     }
 
-    @Test
-    void shouldAlertWithNoFallbackWhenApplicableAndIgnoreTrustedTypesInMeta() {
+    @ParameterizedTest
+    @CsvSource(
+            value = {
+                "default-src 'self'; frame-ancestors 'none'; form-action 'none'; trusted-types * | Wildcard policy names (*) permit any policy name",
+                "default-src 'self'; frame-ancestors 'none'; form-action 'none'; trusted-types * 'allow-duplicates' | Wildcard policy names (*) permit any policy name"
+            },
+            delimiter = '|')
+    void shouldAlertOnWildcardTrustedTypes(String policy, String expectedWarning) {
         // Given
-        String policy = "default-src none; report-to csp-endpoint; require-trusted-types 'script'";
-        HttpMessage msg = createHttpMessage();
-        msg.setResponseBody(
-                "<html><head><<meta http-equiv=\""
-                        + HttpFieldsNames.CONTENT_SECURITY_POLICY
-                        + "\" content=\""
-                        + policy
-                        + "\"></head></html>");
-        msg.getResponseHeader().addHeader(HttpHeader.CONTENT_TYPE, "text/html");
+        HttpMessage msg = createHttpMessage(policy);
         // When
         scanHttpResponseReceive(msg);
         // Then
-        assertThat(alertsRaised.size(), equalTo(2));
+        assertThat(alertsRaised.size(), equalTo(1));
+
         assertThat(alertsRaised.get(0).getName(), equalTo("CSP: Notices"));
-        Alert alert = alertsRaised.get(1);
-        assertThat(alert.getName(), equalTo("CSP: Failure to Define Directive with No Fallback"));
-        assertThat(
-                alert.getOtherInfo(),
-                equalTo(
-                        "The directive(s): form-action is/are among the directives that do not fallback to default-src."));
-        assertThat(alert.getEvidence(), equalTo(policy));
-        assertThat(alert.getRisk(), equalTo(Alert.RISK_MEDIUM));
-        assertThat(alert.getConfidence(), equalTo(Alert.CONFIDENCE_HIGH));
-        assertThat(alert.getAlertRef(), equalTo("10055-13"));
+        assertThat(alertsRaised.get(0).getOtherInfo(), containsString(expectedWarning));
+        assertThat(alertsRaised.get(0).getEvidence(), equalTo(policy));
+        assertThat(alertsRaised.get(0).getRisk(), equalTo(Alert.RISK_LOW));
+        assertThat(alertsRaised.get(0).getConfidence(), equalTo(Alert.CONFIDENCE_HIGH));
+        assertThat(alertsRaised.get(0).getAlertRef(), equalTo("10055-3"));
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+            value = {
+                "default-src 'self'; frame-ancestors 'none'; form-action 'none'; trusted-types myPolicy 'allow-duplicates'",
+                "default-src 'self'; frame-ancestors 'none'; form-action 'none'; trusted-types policy1 policy2 policy3"
+            })
+    void shouldNotAlertOnValidTrustedTypesPolicies(String policy) {
+        // Given
+        HttpMessage msg = createHttpMessage(policy);
+        // When
+        scanHttpResponseReceive(msg);
+        // Then - no alerts
+        assertThat(alertsRaised, is(empty()));
     }
 
     @ParameterizedTest
