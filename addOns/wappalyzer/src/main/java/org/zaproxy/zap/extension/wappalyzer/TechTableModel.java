@@ -108,7 +108,7 @@ public class TechTableModel extends AbstractTableModel {
     }
 
     private static String categoriesToString(List<String> list) {
-        if (list == null) {
+        if (list.isEmpty()) {
             return null;
         }
         StringBuilder sb = new StringBuilder();
@@ -125,7 +125,7 @@ public class TechTableModel extends AbstractTableModel {
     }
 
     private static String listToString(List<String> list) {
-        if (list == null) {
+        if (list.isEmpty()) {
             return null;
         }
         StringBuilder sb = new StringBuilder();

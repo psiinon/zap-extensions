@@ -28,10 +28,17 @@ import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.CALLS_REAL_METHODS;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.withSettings;
 
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import org.junit.jupiter.api.Nested;
@@ -57,23 +64,7 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
             Server: Apache\r
             X-Powered-By: PHP/5.6.34""";
 
-    ApplicationTestHolder defaultHolder;
-
-    public ApplicationTestHolder getDefaultHolder() {
-        if (defaultHolder == null) {
-            try {
-                defaultHolder = new ApplicationTestHolder();
-                TechsJsonParser parser = new TechsJsonParser();
-                TechData result =
-                        parser.parse(
-                                "categories.json", Collections.singletonList("apps.json"), true);
-                defaultHolder.setApplications(result.getApplications());
-            } catch (Exception ex) {
-                throw new RuntimeException(ex);
-            }
-        }
-        return defaultHolder;
-    }
+    private Map<String, List<ApplicationMatch>> siteToAppsMap;
 
     @Override
     protected void setUpMessages() {
@@ -82,8 +73,7 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
 
     @Override
     protected TechPassiveScanner createScanner() {
-        getDefaultHolder().resetApplicationsToSite();
-        return new TechPassiveScanner(getDefaultHolder());
+        return new TechPassiveScanner(createMockApplicationHolder());
     }
 
     @Test
@@ -236,7 +226,7 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
         // Given
         HttpMessage msg = makeHttpMessage();
         msg.getResponseHeader().setHeader(HttpResponseHeader.CONTENT_TYPE, "image/x-icon");
-        // Purposefully set the body to something that should match but be ignored
+        // Purposefully set the body to contain Bitrix URL which should match but be ignored
         msg.setResponseBody("<html><script src=\"/bitrix/js\"></script></html>");
         // When
         scan(msg);
@@ -493,9 +483,9 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
         msg.getResponseHeader().addHeader("Test", "Test Entry");
         // When
         scan(msg);
-        int initialCount = getDefaultHolder().getAppsForSite(site).size();
+        int initialCount = siteToAppsMap.get(site).size();
         scan(msg);
-        int secondaryCount = getDefaultHolder().getAppsForSite(site).size();
+        int secondaryCount = siteToAppsMap.get(site).size();
         // Then
         assertThat(initialCount, is(equalTo(secondaryCount)));
         assertFoundAppCount(site, 1);
@@ -560,12 +550,12 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
     }
 
     private void assertNothingFound(String site) {
-        List<ApplicationMatch> appsForSite = getDefaultHolder().getAppsForSite(site);
+        List<ApplicationMatch> appsForSite = siteToAppsMap.get(site);
         assertNull(appsForSite);
     }
 
     private void assertFoundAppCount(String site, int appCount) {
-        List<ApplicationMatch> appsForSite = getDefaultHolder().getAppsForSite(site);
+        List<ApplicationMatch> appsForSite = siteToAppsMap.get(site);
         assertThat(appsForSite, notNullValue());
         assertThat(appsForSite.size(), is(appCount));
     }
@@ -583,7 +573,7 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
     }
 
     private void assertFoundApp(String site, String appName, String version, boolean withEvidence) {
-        List<ApplicationMatch> appsForSite = getDefaultHolder().getAppsForSite(site);
+        List<ApplicationMatch> appsForSite = siteToAppsMap.get(site);
         assertThat(appsForSite, notNullValue());
 
         Optional<ApplicationMatch> app =
@@ -605,8 +595,7 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
 
         @Override
         protected TechPassiveScanner createScanner() {
-            getDefaultHolder().resetApplicationsToSite();
-            return new TechPassiveScanner(getDefaultHolder());
+            return new TechPassiveScanner(createMockApplicationHolder());
         }
 
         @Test
@@ -692,5 +681,156 @@ class TechPassiveScannerUnitTest extends PassiveScannerTestUtils<TechPassiveScan
                                             + "The following version(s) is/are associated with the identified tech: 55.4.3")));
             assertThat(alert.getWascId(), is(equalTo(13)));
         }
+    }
+
+    private ApplicationHolder createMockApplicationHolder() {
+        siteToAppsMap = new HashMap<>();
+
+        ApplicationHolder holder =
+                mock(ApplicationHolder.class, withSettings().defaultAnswer(CALLS_REAL_METHODS));
+
+        List<Application> applications = createTestApplications();
+        lenient().when(holder.getApplications()).thenReturn(applications);
+
+        lenient()
+                .doAnswer(
+                        invocation -> {
+                            String site = invocation.getArgument(0);
+                            ApplicationMatch match = invocation.getArgument(1);
+                            siteToAppsMap.computeIfAbsent(site, k -> new ArrayList<>()).add(match);
+                            return null;
+                        })
+                .when(holder)
+                .addApplicationsToSite(anyString(), any(ApplicationMatch.class));
+
+        return holder;
+    }
+
+    private static List<Application> createTestApplications() {
+        return List.of(
+                createApache(),
+                createPhp(),
+                createModernizr(),
+                createTestEntry(),
+                createTestEntry2(),
+                createBitrix());
+    }
+
+    private static Application newApplication() {
+        return new Application();
+    }
+
+    private static Application createApache() {
+        Application app = newApplication();
+        app.setName("Apache");
+        // Headers: Server pattern with version extraction
+        AppPattern serverPattern =
+                createAppPattern("HEADER", "(?:Apache(?:$|/([\\d.]+)|[^/-])|(?:^|\\b)HTTPD)");
+        serverPattern.setVersion("\\1");
+        app.setHeaders(List.of(Map.of("Server", serverPattern)));
+        // Meta: generator
+        app.setMetas(List.of(Map.of("generator", createAppPattern("META", "Apache"))));
+        // DOM: complex nested structure
+        AppPattern domAttrPattern = createAppPattern("DOM", "^version ([0-9.]+)$");
+        domAttrPattern.setVersion("\\1");
+        app.setDom(
+                List.of(
+                        Map.of(
+                                "a[href='https://www.apache.com'][title*='version']",
+                                Map.of("attributes", Map.of("title", domAttrPattern)))));
+
+        return app;
+    }
+
+    private static Application createPhp() {
+        Application app = newApplication();
+        app.setName("PHP");
+        // URL pattern
+        app.setUrl(List.of(createAppPattern("URL", "\\.php(?:$|\\?)")));
+        // Headers: X-Powered-By with version extraction
+        AppPattern headerPattern = createAppPattern("HEADER", "^php/?([\\d.]+)?");
+        headerPattern.setVersion("\\1");
+        app.setHeaders(List.of(Map.of("X-Powered-By", headerPattern)));
+        // Cookies: PHPSESSID (empty pattern means just check for cookie name)
+        app.setCookies(List.of(Map.of("PHPSESSID", createAppPattern("COOKIE", ""))));
+
+        return app;
+    }
+
+    private static Application createModernizr() {
+        Application app = newApplication();
+        app.setName("Modernizr");
+        // Script source pattern
+        app.setScript(List.of(createAppPattern("SCRIPT", "modernizr")));
+        // DOM: simple text match
+        app.setDom(
+                List.of(
+                        Map.of(
+                                "a[href*=\"www.modern.com\"]",
+                                Map.of("", Map.of("text", createAppPattern("DOM", "Modern"))))));
+
+        return app;
+    }
+
+    private static Application createTestEntry() {
+        Application app = newApplication();
+        app.setName("Test Entry");
+        // Headers
+        app.setHeaders(
+                List.of(
+                        Map.of("Test", createAppPattern("HEADER", "Test Entry")),
+                        Map.of("Foo", createAppPattern("HEADER", ""))));
+        // Cookies
+        app.setCookies(List.of(Map.of("foo", createAppPattern("COOKIE", "bar"))));
+        // Meta
+        app.setMetas(List.of(Map.of("generator", createAppPattern("META", "Generator 2"))));
+        // DOM
+        app.setDom(
+                List.of(
+                        Map.of(
+                                "a[href='https://www.example.com'][title*='version']",
+                                Map.of(
+                                        "",
+                                        Map.of(
+                                                "text",
+                                                createAppPattern("DOM", "Example"),
+                                                "title",
+                                                createAppPattern("DOM", "version"))))));
+        // CSS
+        app.setCss(List.of(createAppPattern("CSS", "\\.example")));
+
+        return app;
+    }
+
+    private static Application createTestEntry2() {
+        Application app = newApplication();
+        app.setName("Test Entry2");
+        // Simple DOM selector (array format)
+        app.setSimpleDom(List.of("script[src*=\"sites/g/files\"]"));
+
+        return app;
+    }
+
+    private static Application createBitrix() {
+        Application app = newApplication();
+        app.setName("1C-Bitrix");
+        app.setHeaders(
+                List.of(
+                        Map.of(
+                                "X-Powered-CMS",
+                                createAppPattern("HEADER", "Bitrix Site Manager"))));
+        // URL pattern
+        app.setUrl(List.of(createAppPattern("URL", "/bitrix/js")));
+        // Implies PHP
+        app.setImplies(List.of("PHP"));
+
+        return app;
+    }
+
+    private static AppPattern createAppPattern(String type, String pattern) {
+        AppPattern appPattern = new AppPattern();
+        appPattern.setType(type);
+        appPattern.setPattern(pattern);
+        return appPattern;
     }
 }

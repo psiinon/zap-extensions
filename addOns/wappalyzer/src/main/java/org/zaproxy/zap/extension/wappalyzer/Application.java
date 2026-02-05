@@ -32,13 +32,13 @@ public class Application {
     private ImageIcon icon = null;
     private List<String> categories = new ArrayList<>();
     private String cpe;
-    private List<Map<String, AppPattern>> headers;
-    private List<Map<String, AppPattern>> cookies;
+    private List<Map<String, AppPattern>> headers = new ArrayList<>();
+    private List<Map<String, AppPattern>> cookies = new ArrayList<>();
     private List<AppPattern> url = new ArrayList<>();
     private List<AppPattern> html = new ArrayList<>();
-    private List<Map<String, AppPattern>> metas;
-    private List<Map<String, Map<String, Map<String, AppPattern>>>> dom;
-    private List<String> simpleDom;
+    private List<Map<String, AppPattern>> metas = new ArrayList<>();
+    private List<Map<String, Map<String, Map<String, AppPattern>>>> dom = new ArrayList<>();
+    private List<String> simpleDom = new ArrayList<>();
     private List<AppPattern> css = new ArrayList<>();
     private List<AppPattern> script = new ArrayList<>();
 
