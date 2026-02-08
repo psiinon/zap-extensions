@@ -46,7 +46,7 @@ public class GraphQlFingerprinter {
     private static final Logger LOGGER = LogManager.getLogger(GraphQlFingerprinter.class);
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
-    private static List<DiscoveredGraphQlEngineHandler> handlers;
+    private static final List<DiscoveredGraphQlEngineHandler> handlers = new ArrayList<>(2);
 
     private final URI endpointUrl;
     private final Requestor requestor;
@@ -56,7 +56,6 @@ public class GraphQlFingerprinter {
     private String matchedString;
 
     public GraphQlFingerprinter(URI endpointUrl, Requestor requestor) {
-        resetHandlers();
         this.endpointUrl = endpointUrl;
         this.requestor = requestor;
         queryCache = new HashMap<>();
@@ -642,14 +641,11 @@ public class GraphQlFingerprinter {
     }
 
     public static void addEngineHandler(DiscoveredGraphQlEngineHandler handler) {
-        if (handlers == null) {
-            resetHandlers();
-        }
         handlers.add(handler);
     }
 
     public static void resetHandlers() {
-        handlers = new ArrayList<>(2);
+        handlers.clear();
     }
 
     public static class DiscoveredGraphQlEngine {
