@@ -22,6 +22,7 @@ package org.zaproxy.addon.graphql;
 import static fi.iki.elonen.NanoHTTPD.newFixedLengthResponse;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
@@ -54,6 +55,7 @@ import org.apache.logging.log4j.core.layout.PatternLayout;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
@@ -189,144 +191,6 @@ class GraphQlFingerprinterUnitTest extends TestUtils {
         verifyNoInteractions(extensionAlert);
     }
 
-    static Stream<Arguments> fingerprintData() {
-        return Stream.of(
-                arguments("Lighthouse", errorResponse("Internal server error")),
-                arguments("Lighthouse", errorResponse("internal", "category")),
-                arguments("caliban", errorResponse("Fragment 'zap' is not used in any spread")),
-                arguments(
-                        "lacinia",
-                        errorResponse("Cannot query field `zaproxy' on type `QueryRoot'.")),
-                arguments("jaal", errorResponse("must have a single query")),
-                arguments("morpheus-graphql", errorResponse("expecting white space")),
-                arguments("morpheus-graphql", errorResponse("offset")),
-                arguments("mercurius", errorResponse("Unknown query")),
-                arguments(
-                        "GraphQL Yoga",
-                        errorResponse(
-                                "asyncExecutionResult[Symbol.asyncIterator] is not a function")),
-                arguments("GraphQL Yoga", errorResponse("Unexpected error.")),
-                arguments("Agoo", errorResponse("eval error", "code")),
-                arguments("Dgraph", "{ \"data\": { \"__typename\":\"Query\" } }"),
-                arguments("gqlgen", errorResponse("expected at least one definition")),
-                arguments("gqlgen", errorResponse("Expected Name, found <Invalid>")),
-                arguments("Ariadne", errorResponse("Unknown directive '@abc'.", "message", false)),
-                arguments("Ariadne", errorResponse("The query must be a string.")),
-                arguments(
-                        "Apollo",
-                        errorResponse(
-                                "Directive \\\"@skip\\\" argument \\\"if\\\" of type \\\"Boolean!\\\" is required, but it was not provided.")),
-                arguments(
-                        "Apollo",
-                        errorResponse("Directive \\\"@deprecated\\\" may not be used on QUERY.")),
-                arguments("AWS AppSync", errorResponse("MisplacedDirective")),
-                arguments("Hasura", "{ \"data\": { \"__typename\":\"query_root\" } }"),
-                arguments(
-                        "Hasura",
-                        errorResponse("field \\\"zaproxy\\\" not found in type: 'query_root'")),
-                arguments(
-                        "Hasura",
-                        errorResponse("directive \\\"skip\\\" is not allowed on a query")),
-                arguments("Hasura", errorResponse("missing selection set for \\\"__Schema\\\"")),
-                arguments(
-                        "WPGraphQL WordPress Plugin",
-                        errorResponse(
-                                "GraphQL Request must include at least one of those two parameters: \\\"query\\\" or \\\"queryId\\\"")),
-                arguments(
-                        "WPGraphQL WordPress Plugin",
-                        "{ \"errors\" : [ { \"message\" : \"Syntax Error: Expected Name, found $\" } ], \"data\" : { }, \"extensions\" : { \"debug\" : [ { \"type\" : \"DEBUG_LOGS_INACTIVE\" } ] } }"),
-                arguments(
-                        "WPGraphQL WordPress Plugin",
-                        "{ \"errors\" : [ { \"message\" : \"Syntax Error: Expected Name, found $\" } ], \"data\" : { },  \"extensions\" : { \"debug\" : [ { \"message\" : \"GraphQL Debug logging is not active. To see debug logs, GRAPHQL_DEBUG must be enabled.\" } ] } }"),
-                arguments("GraphQL by PoP", "{ \"data\" : { \"alias1$1\" : \"QueryRoot\" } }"),
-                arguments("GraphQL by PoP", errorResponse("Unexpected token \\\"END\\\"")),
-                arguments(
-                        "GraphQL by PoP",
-                        errorResponse(
-                                "Argument 'if' cannot be empty, so directive 'skip' has been ignored")),
-                arguments(
-                        "GraphQL by PoP",
-                        errorResponse(
-                                "No DirectiveResolver resolves directive with name 'doesnotexist'")),
-                arguments("GraphQL by PoP", errorResponse("The query in the body is empty")),
-                arguments(
-                        "graphql-java", errorResponse("Invalid Syntax : offending token 'queryy'")),
-                arguments(
-                        "graphql-java",
-                        errorResponse(
-                                "Validation error of type DuplicateDirectiveName: Directives must be uniquely named within a location.")),
-                arguments(
-                        "graphql-java", errorResponse("Invalid Syntax : offending token '<EOF>'")),
-                arguments(
-                        "HyperGraphQL",
-                        errorResponse(
-                                "Validation error of type InvalidSyntax: Invalid query syntax.")),
-                arguments(
-                        "HyperGraphQL",
-                        errorResponse(
-                                "Validation error of type UnknownDirective: Unknown directive deprecated @ '__typename'")),
-                arguments(
-                        "graphql-ruby",
-                        errorResponse(
-                                "'@skip' can't be applied to queries (allowed: fields, fragment spreads, inline fragments)")),
-                arguments(
-                        "graphql-ruby",
-                        errorResponse("Directive 'skip' is missing required arguments: if")),
-                arguments(
-                        "graphql-ruby", errorResponse("'@deprecated' can't be applied to queries")),
-                arguments("graphql-ruby", errorResponse("Parse error on \\\"}\\\" (RCURLY)")),
-                arguments(
-                        "graphql-ruby",
-                        errorResponse("Directive 'skip' is missing required arguments: if")),
-                arguments(
-                        "graphql-php",
-                        errorResponse(
-                                "Directive \\\"deprecated\\\" may not be used on \\\"QUERY\\\".")),
-                arguments("gqlgen", errorResponse("expected at least one definition")),
-                arguments("gqlgen", errorResponse("Expected Name, found <Invalid>")),
-                arguments("graphql-go", errorResponse("Unexpected empty IN")),
-                arguments("graphql-go", errorResponse("Must provide an operation.")),
-                arguments("graphql-go", "{ \"data\": { \"__typename\":\"RootQuery\" } }"),
-                arguments("Juniper", errorResponse("Unexpected \\\"queryy\\\"")),
-                arguments("Juniper", errorResponse("Unexpected end of input")),
-                arguments(
-                        "Sangria",
-                        "{ \"syntaxError\" : \"Syntax error while parsing GraphQL query. Invalid input \\\"queryy\\\", expected ExecutableDefinition or TypeSystemDefinition\" }"),
-                arguments(
-                        "graphql-flutter",
-                        errorResponse("Directive \\\"deprecated\\\" may not be used on FIELD.")),
-                arguments(
-                        "Diana.jl",
-                        errorResponse(
-                                "Syntax Error GraphQL request (1:1) Unexpected Name \\\"queryy\\\"")),
-                arguments(
-                        "Strawberry",
-                        errorResponse("Directive '@deprecated' may not be used on query.")),
-                arguments("tartiflette", errorResponse("Unknow Directive < @doesnotexist >.")),
-                arguments(
-                        "tartiflette",
-                        errorResponse("Missing mandatory argument < if > in directive < @skip >.")),
-                arguments("tartiflette", errorResponse("Field zaproxy doesn't exist on Query")),
-                arguments(
-                        "tartiflette",
-                        errorResponse(
-                                "Directive < @deprecated > is not used in a valid location.")),
-                arguments("tartiflette", errorResponse("syntax error, unexpected IDENTIFIER")),
-                arguments(
-                        "Directus",
-                        "{ \"errors\" : [ { \"extensions\" : { \"code\" : \"INVALID_PAYLOAD\" } } ] }"),
-                arguments(
-                        "Absinthe",
-                        errorResponse(
-                                "Cannot query field \\\"zaproxy\\\" on type \\\"RootQueryType\\\".")),
-                arguments(
-                        "GraphQL.NET", errorResponse("Directive 'skip' may not be used on Query.")),
-                arguments("pg_graphql", errorResponse("Unknown argument to @skip: aaQuery.")),
-                arguments("tailcall", errorResponse("expected executable_definition")),
-                arguments("Hot Chocolate", errorResponse("Unexpected token: Name.")),
-                arguments("Inigo", "{\"extensions\": {\"inigo\": []}}"));
-    }
-
     private static String errorResponse(String error) {
         return errorResponse(error, "message");
     }
@@ -345,59 +209,248 @@ class GraphQlFingerprinterUnitTest extends TestUtils {
                 + " }";
     }
 
-    @SuppressWarnings("null")
-    @ParameterizedTest
-    @MethodSource("fingerprintData")
-    void shouldFingerprintValidData(String graphqlImpl, String response) throws Exception {
-        // Given
-        nano.addHandler(new GraphQlResponseHandler(response));
-        var fp = buildFingerprinter(endpointUrl);
-        List<DiscoveredGraphQlEngine> discoveredEngine = new ArrayList<>(1);
-        GraphQlFingerprinter.addEngineHandler(discoveredEngine::add);
-        // When
-        fp.fingerprint();
-        // Then
-        Alert alert =
-                GraphQlFingerprinter.createFingerprintingAlert(discoveredEngine.get(0)).build();
-        assertThat(alert, is(notNullValue()));
-        assertThat(alert.getDescription(), containsString(graphqlImpl));
-        // Check "handled" values
-        assertThat(discoveredEngine.get(0).getUri().toString(), is(equalTo(endpointUrl)));
-        assertThat(discoveredEngine.get(0).getName(), is(equalTo(graphqlImpl)));
-    }
+    @Nested
+    class HandlerTests {
 
-    @Test
-    void shouldFingerprintWithoutAddedHandler() throws Exception {
-        // Given
-        ExtensionAlert extensionAlert = mockExtensionAlert();
-        nano.addHandler(new GraphQlResponseHandler(errorResponse("The query must be a string.")));
-        var fp = buildFingerprinter(endpointUrl);
-        // When
-        fp.fingerprint();
-        // Then
-        assertNoErrors(extensionAlert, writer.toString());
-    }
+        private ExtensionAlert extensionAlert;
 
-    @Test
-    void shouldFingerprintAfterHandlerReset() throws Exception {
-        // Given
-        ExtensionAlert extensionAlert = mockExtensionAlert();
-        nano.addHandler(new GraphQlResponseHandler(errorResponse("The query must be a string.")));
-        var fp = buildFingerprinter(endpointUrl);
-        // When
-        GraphQlFingerprinter.resetHandlers();
-        fp.fingerprint();
-        // Then
-        assertNoErrors(extensionAlert, writer.toString());
-    }
+        @BeforeEach
+        void setUpHandlerTests() {
+            extensionAlert = mockExtensionAlert();
+        }
 
-    @Test
-    @Order(1)
-    void shouldStaticallyAddHandlerWithoutException() throws Exception {
-        // Given
-        List<DiscoveredGraphQlEngine> handler = new ArrayList<>();
-        // When / Then
-        assertDoesNotThrow(() -> GraphQlFingerprinter.addEngineHandler(handler::add));
+        @Test
+        void shouldFingerprintWithoutAddedHandler() throws Exception {
+            // Given
+            nano.addHandler(new GraphQlResponseHandler());
+            var fp = buildFingerprinter(endpointUrl);
+            // When
+            fp.fingerprint();
+            // Then
+            assertNoErrors(extensionAlert, writer.toString());
+        }
+
+        @Test
+        void shouldFingerprintAfterHandlerReset() throws Exception {
+            // Given
+            nano.addHandler(new GraphQlResponseHandler());
+            var fp = buildFingerprinter(endpointUrl);
+            // When
+            GraphQlFingerprinter.resetHandlers();
+            fp.fingerprint();
+            // Then
+            assertNoErrors(extensionAlert, writer.toString());
+        }
+
+        @Test
+        @Order(1)
+        void shouldStaticallyAddHandlerWithoutException() throws Exception {
+            // Given
+            List<DiscoveredGraphQlEngine> handler = new ArrayList<>();
+            // When / Then
+            assertDoesNotThrow(() -> GraphQlFingerprinter.addEngineHandler(handler::add));
+        }
+
+        @Test
+        void shouldPreserveHandlersAcrossMultipleFingerprinterInstances() throws Exception {
+            // Given
+            nano.addHandler(new GraphQlResponseHandler());
+            List<DiscoveredGraphQlEngine> discoveredEngines = new ArrayList<>();
+            GraphQlFingerprinter.addEngineHandler(discoveredEngines::add);
+            // When
+            var fp = buildFingerprinter(endpointUrl);
+            fp.fingerprint();
+            // Then
+            assertThat(discoveredEngines, hasSize(1));
+            assertThat(discoveredEngines.get(0).getName(), is(equalTo("Ariadne")));
+        }
+
+        @Test
+        void shouldClearHandlersOnReset() throws Exception {
+            // Given
+            nano.addHandler(new GraphQlResponseHandler());
+            List<DiscoveredGraphQlEngine> handler1 = new ArrayList<>();
+            List<DiscoveredGraphQlEngine> handler2 = new ArrayList<>();
+            GraphQlFingerprinter.addEngineHandler(handler1::add);
+            GraphQlFingerprinter.addEngineHandler(handler2::add);
+            // When
+            GraphQlFingerprinter.resetHandlers();
+            var fp = buildFingerprinter(endpointUrl);
+            fp.fingerprint();
+            // Then
+            assertThat(handler1, is(empty()));
+            assertThat(handler2, is(empty()));
+        }
+
+        static Stream<Arguments> fingerprintData() {
+            return Stream.of(
+                    arguments("Lighthouse", errorResponse("Internal server error")),
+                    arguments("Lighthouse", errorResponse("internal", "category")),
+                    arguments("caliban", errorResponse("Fragment 'zap' is not used in any spread")),
+                    arguments(
+                            "lacinia",
+                            errorResponse("Cannot query field `zaproxy' on type `QueryRoot'.")),
+                    arguments("jaal", errorResponse("must have a single query")),
+                    arguments("morpheus-graphql", errorResponse("expecting white space")),
+                    arguments("morpheus-graphql", errorResponse("offset")),
+                    arguments("mercurius", errorResponse("Unknown query")),
+                    arguments(
+                            "GraphQL Yoga",
+                            errorResponse(
+                                    "asyncExecutionResult[Symbol.asyncIterator] is not a function")),
+                    arguments("GraphQL Yoga", errorResponse("Unexpected error.")),
+                    arguments("Agoo", errorResponse("eval error", "code")),
+                    arguments("Dgraph", "{ \"data\": { \"__typename\":\"Query\" } }"),
+                    arguments("gqlgen", errorResponse("expected at least one definition")),
+                    arguments("gqlgen", errorResponse("Expected Name, found <Invalid>")),
+                    arguments(
+                            "Ariadne",
+                            errorResponse("Unknown directive '@abc'.", "message", false)),
+                    arguments("Ariadne", errorResponse("The query must be a string.")),
+                    arguments(
+                            "Apollo",
+                            errorResponse(
+                                    "Directive \\\"@skip\\\" argument \\\"if\\\" of type \\\"Boolean!\\\" is required, but it was not provided.")),
+                    arguments(
+                            "Apollo",
+                            errorResponse(
+                                    "Directive \\\"@deprecated\\\" may not be used on QUERY.")),
+                    arguments("AWS AppSync", errorResponse("MisplacedDirective")),
+                    arguments("Hasura", "{ \"data\": { \"__typename\":\"query_root\" } }"),
+                    arguments(
+                            "Hasura",
+                            errorResponse("field \\\"zaproxy\\\" not found in type: 'query_root'")),
+                    arguments(
+                            "Hasura",
+                            errorResponse("directive \\\"skip\\\" is not allowed on a query")),
+                    arguments(
+                            "Hasura", errorResponse("missing selection set for \\\"__Schema\\\"")),
+                    arguments(
+                            "WPGraphQL WordPress Plugin",
+                            errorResponse(
+                                    "GraphQL Request must include at least one of those two parameters: \\\"query\\\" or \\\"queryId\\\"")),
+                    arguments(
+                            "WPGraphQL WordPress Plugin",
+                            "{ \"errors\" : [ { \"message\" : \"Syntax Error: Expected Name, found $\" } ], \"data\" : { }, \"extensions\" : { \"debug\" : [ { \"type\" : \"DEBUG_LOGS_INACTIVE\" } ] } }"),
+                    arguments(
+                            "WPGraphQL WordPress Plugin",
+                            "{ \"errors\" : [ { \"message\" : \"Syntax Error: Expected Name, found $\" } ], \"data\" : { },  \"extensions\" : { \"debug\" : [ { \"message\" : \"GraphQL Debug logging is not active. To see debug logs, GRAPHQL_DEBUG must be enabled.\" } ] } }"),
+                    arguments("GraphQL by PoP", "{ \"data\" : { \"alias1$1\" : \"QueryRoot\" } }"),
+                    arguments("GraphQL by PoP", errorResponse("Unexpected token \\\"END\\\"")),
+                    arguments(
+                            "GraphQL by PoP",
+                            errorResponse(
+                                    "Argument 'if' cannot be empty, so directive 'skip' has been ignored")),
+                    arguments(
+                            "GraphQL by PoP",
+                            errorResponse(
+                                    "No DirectiveResolver resolves directive with name 'doesnotexist'")),
+                    arguments("GraphQL by PoP", errorResponse("The query in the body is empty")),
+                    arguments(
+                            "graphql-java",
+                            errorResponse("Invalid Syntax : offending token 'queryy'")),
+                    arguments(
+                            "graphql-java",
+                            errorResponse(
+                                    "Validation error of type DuplicateDirectiveName: Directives must be uniquely named within a location.")),
+                    arguments(
+                            "graphql-java",
+                            errorResponse("Invalid Syntax : offending token '<EOF>'")),
+                    arguments(
+                            "HyperGraphQL",
+                            errorResponse(
+                                    "Validation error of type InvalidSyntax: Invalid query syntax.")),
+                    arguments(
+                            "HyperGraphQL",
+                            errorResponse(
+                                    "Validation error of type UnknownDirective: Unknown directive deprecated @ '__typename'")),
+                    arguments(
+                            "graphql-ruby",
+                            errorResponse(
+                                    "'@skip' can't be applied to queries (allowed: fields, fragment spreads, inline fragments)")),
+                    arguments(
+                            "graphql-ruby",
+                            errorResponse("Directive 'skip' is missing required arguments: if")),
+                    arguments(
+                            "graphql-ruby",
+                            errorResponse("'@deprecated' can't be applied to queries")),
+                    arguments("graphql-ruby", errorResponse("Parse error on \\\"}\\\" (RCURLY)")),
+                    arguments(
+                            "graphql-ruby",
+                            errorResponse("Directive 'skip' is missing required arguments: if")),
+                    arguments(
+                            "graphql-php",
+                            errorResponse(
+                                    "Directive \\\"deprecated\\\" may not be used on \\\"QUERY\\\".")),
+                    arguments("gqlgen", errorResponse("expected at least one definition")),
+                    arguments("gqlgen", errorResponse("Expected Name, found <Invalid>")),
+                    arguments("graphql-go", errorResponse("Unexpected empty IN")),
+                    arguments("graphql-go", errorResponse("Must provide an operation.")),
+                    arguments("graphql-go", "{ \"data\": { \"__typename\":\"RootQuery\" } }"),
+                    arguments("Juniper", errorResponse("Unexpected \\\"queryy\\\"")),
+                    arguments("Juniper", errorResponse("Unexpected end of input")),
+                    arguments(
+                            "Sangria",
+                            "{ \"syntaxError\" : \"Syntax error while parsing GraphQL query. Invalid input \\\"queryy\\\", expected ExecutableDefinition or TypeSystemDefinition\" }"),
+                    arguments(
+                            "graphql-flutter",
+                            errorResponse(
+                                    "Directive \\\"deprecated\\\" may not be used on FIELD.")),
+                    arguments(
+                            "Diana.jl",
+                            errorResponse(
+                                    "Syntax Error GraphQL request (1:1) Unexpected Name \\\"queryy\\\"")),
+                    arguments(
+                            "Strawberry",
+                            errorResponse("Directive '@deprecated' may not be used on query.")),
+                    arguments("tartiflette", errorResponse("Unknow Directive < @doesnotexist >.")),
+                    arguments(
+                            "tartiflette",
+                            errorResponse(
+                                    "Missing mandatory argument < if > in directive < @skip >.")),
+                    arguments("tartiflette", errorResponse("Field zaproxy doesn't exist on Query")),
+                    arguments(
+                            "tartiflette",
+                            errorResponse(
+                                    "Directive < @deprecated > is not used in a valid location.")),
+                    arguments("tartiflette", errorResponse("syntax error, unexpected IDENTIFIER")),
+                    arguments(
+                            "Directus",
+                            "{ \"errors\" : [ { \"extensions\" : { \"code\" : \"INVALID_PAYLOAD\" } } ] }"),
+                    arguments(
+                            "Absinthe",
+                            errorResponse(
+                                    "Cannot query field \\\"zaproxy\\\" on type \\\"RootQueryType\\\".")),
+                    arguments(
+                            "GraphQL.NET",
+                            errorResponse("Directive 'skip' may not be used on Query.")),
+                    arguments("pg_graphql", errorResponse("Unknown argument to @skip: aaQuery.")),
+                    arguments("tailcall", errorResponse("expected executable_definition")),
+                    arguments("Hot Chocolate", errorResponse("Unexpected token: Name.")),
+                    arguments("Inigo", "{\"extensions\": {\"inigo\": []}}"));
+        }
+
+        @SuppressWarnings("null")
+        @ParameterizedTest
+        @MethodSource("fingerprintData")
+        void shouldFingerprintValidData(String graphqlImpl, String response) throws Exception {
+            // Given
+            GraphQlFingerprinter.resetHandlers();
+            nano.addHandler(new GraphQlResponseHandler(response));
+            var fp = buildFingerprinter(endpointUrl);
+            List<DiscoveredGraphQlEngine> discoveredEngine = new ArrayList<>(1);
+            GraphQlFingerprinter.addEngineHandler(discoveredEngine::add);
+            // When
+            fp.fingerprint();
+            // Then
+            Alert alert =
+                    GraphQlFingerprinter.createFingerprintingAlert(discoveredEngine.get(0)).build();
+            assertThat(alert, is(notNullValue()));
+            assertThat(alert.getDescription(), containsString(graphqlImpl));
+            // Check "handled" values
+            assertThat(discoveredEngine.get(0).getUri().toString(), is(equalTo(endpointUrl)));
+            assertThat(discoveredEngine.get(0).getName(), is(equalTo(graphqlImpl)));
+        }
     }
 
     private static void assertNoErrors(ExtensionAlert extMock, String loggerOutput) {
@@ -419,6 +472,10 @@ class GraphQlFingerprinterUnitTest extends TestUtils {
     private static class GraphQlResponseHandler extends NanoServerHandler {
 
         private final String response;
+
+        public GraphQlResponseHandler() {
+            this(errorResponse("The query must be a string."));
+        }
 
         public GraphQlResponseHandler(String response) {
             super("/graphql");
