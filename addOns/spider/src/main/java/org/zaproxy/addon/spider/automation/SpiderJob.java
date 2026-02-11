@@ -233,6 +233,7 @@ public class SpiderJob extends AutomationJob {
 
         forceStop = false;
         int scanId = this.getExtSpider().startScan(target, user, contextSpecificObjects.toArray());
+        SpiderScan scan = this.getExtSpider().getScan(scanId);
 
         long endTime = Long.MAX_VALUE;
         if (parameters.getMaxDuration() != null && parameters.getMaxDuration() > 0) {
@@ -244,14 +245,12 @@ public class SpiderJob extends AutomationJob {
         }
 
         // Wait for the spider to finish
-        SpiderScan scan;
         int numUrlsFound = 0;
         int lastCount = 0;
 
         while (true) {
             this.sleep(500);
 
-            scan = this.getExtSpider().getScan(scanId);
             numUrlsFound = scan.getNumberOfURIsFound();
             Stats.incCounter(URLS_ADDED_STATS_KEY, numUrlsFound - lastCount);
             lastCount = numUrlsFound;

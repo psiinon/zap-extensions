@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Maintenance changes.
 
 ### Fixed
-- Handle persistence errors in automation job.
+- Handle persistence errors and forced shutdown in automation job.
 
 ## [0.18.0] - 2025-12-15
 ### Changed
