@@ -90,4 +90,6 @@ dependencies {
     zapAddOn("selenium")
     zapAddOn("spider")
     zapAddOn("spiderAjax")
+
+    testImplementation(project(":testutils"))
 }

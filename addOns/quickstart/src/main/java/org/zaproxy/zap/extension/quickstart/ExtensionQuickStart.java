@@ -788,6 +788,10 @@ public class ExtensionQuickStart extends ExtensionAdaptor
 
     @Override
     public void optionsChanged(OptionsParam optionsParam) {
+        if (!hasView()) {
+            return;
+        }
+
         this.getQuickStartPanel().optionsChanged(optionsParam);
     }
 
