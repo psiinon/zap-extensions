@@ -92,12 +92,6 @@ public class ContentSecurityPolicyScanRule extends PluginPassiveScanner
     private static final List<String> DIRECTIVES_WITHOUT_FALLBACK =
             List.of("form-action", FRAME_ANCESTORS);
 
-    private static final List<String> ALLOWED_DIRECTIVES =
-            List.of(
-                    // TODO: Remove once https://github.com/HtmlUnit/htmlunit-csp/issues/4 is
-                    // addressed
-                    "require-trusted-types-for", "trusted-types");
-
     private static final String RAND_FQDN = "7963124546083337415.owasp.org";
     private static final Optional<URLWithScheme> HTTP_URI =
             Optional.of(URI.parseURI("http://" + RAND_FQDN).get());
@@ -133,11 +127,8 @@ public class ContentSecurityPolicyScanRule extends PluginPassiveScanner
             List<PolicyError> observedErrors = new ArrayList<>();
             PolicyErrorConsumer consumer =
                     (severity, message, directiveIndex, valueIndex) -> {
-                        // Skip notices for directives that Salvation doesn't handle
-                        if (ALLOWED_DIRECTIVES.stream().noneMatch(message::contains)) {
-                            observedErrors.add(
-                                    new PolicyError(severity, message, directiveIndex, valueIndex));
-                        }
+                        observedErrors.add(
+                                new PolicyError(severity, message, directiveIndex, valueIndex));
                     };
 
             for (String csp : cspOptions) {
@@ -217,13 +208,8 @@ public class ContentSecurityPolicyScanRule extends PluginPassiveScanner
                 List<PolicyError> metaObservedErrors = new ArrayList<>();
                 PolicyErrorConsumer metaConsumer =
                         (severity, message, directiveIndex, valueIndex) -> {
-                            // Skip notices for directives that Salvation doesn't
-                            // handle
-                            if (ALLOWED_DIRECTIVES.stream().noneMatch(message::contains)) {
-                                metaObservedErrors.add(
-                                        new PolicyError(
-                                                severity, message, directiveIndex, valueIndex));
-                            }
+                            metaObservedErrors.add(
+                                    new PolicyError(severity, message, directiveIndex, valueIndex));
                         };
                 Policy parsedMetaPolicy = parsePolicy(metaPolicy, metaConsumer, msg, id);
                 if (parsedMetaPolicy == null) {
