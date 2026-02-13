@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - UI support for Zest script options.
 - Now supports authentication for client side scripts.
 
+### Fixed
+- Bug which prevented client side scripts from being recorded in ZAP.
+
 ### Changed
 - Update Zest library to 0.35.0:
   - Migrate JSON serialization from Gson to Jackson.

@@ -25,13 +25,14 @@ import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.sameInstance;
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
-import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
@@ -55,6 +56,7 @@ import org.zaproxy.zap.extension.script.ExtensionScript;
 import org.zaproxy.zap.extension.script.ScriptType;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
+import org.zaproxy.zest.core.v1.ZestElement;
 
 /** Unit test for {@link ExtensionZest}. */
 class ExtensionZestUnitTest {
@@ -73,6 +75,14 @@ class ExtensionZestUnitTest {
         given(sw.getEngineName()).willReturn(null);
         // When/ Then
         assertDoesNotThrow(() -> extension.scriptAdded(sw, false));
+    }
+
+    @Test
+    void shouldConvertingBlankStringToNullElement() {
+        // Given / When
+        ZestElement element = extension.convertStringToElement("  ");
+        // Then
+        assertThat(element, is(nullValue()));
     }
 
     @Nested
