@@ -4,7 +4,7 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+## [48.12.0] - 2026-02-13
 ### Added
 - UI support for Zest script options.
 - Now supports authentication for client side scripts.
@@ -458,6 +458,7 @@ Sender scripts. (Issue 5590)
 
 - Updated for 2.1.0
 
+[48.12.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.12.0
 [48.11.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.11.0
 [48.10.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.10.0
 [48.9.0]: https://github.com/zaproxy/zap-extensions/releases/zest-v48.9.0
