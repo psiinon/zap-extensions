@@ -19,8 +19,6 @@
  */
 package org.zaproxy.zap.extension.openapi;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
-import io.swagger.v3.core.util.Json;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.parser.core.models.SwaggerParseResult;
 import java.awt.EventQueue;
@@ -370,18 +368,10 @@ public class ExtensionOpenApi extends ExtensionAdaptor implements CommandLineLis
                 throw new InvalidDefinitionException();
             }
 
-            String openApiString;
-            try {
-                openApiString = Json.mapper().writeValueAsString(openApi);
-            } catch (JsonMappingException e) {
-                if (e.getOriginalMessage().contains("TextBuffer overrun")) {
-                    LOGGER.warn(
-                            "Fully resolved definition is too large, trying to use original definition only.");
-                    openApiString = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
-                } else {
-                    throw e;
-                }
-            }
+            // Use original file content so the converter parses the same definition and
+            // preserves schema structure (e.g. OpenAPI 3.1 array request bodies). Using the
+            // serialized OpenAPI can alter how schemas are represented and break body generation.
+            String openApiString = FileUtils.readFileToString(file, StandardCharsets.UTF_8);
 
             List<String> errors =
                     importOpenApiDefinition(

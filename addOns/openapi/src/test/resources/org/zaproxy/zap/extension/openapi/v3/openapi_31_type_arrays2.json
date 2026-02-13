@@ -1,0 +1,867 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Management API",
+    "description": "Service",
+    "contact": {
+      "name": "masked",
+      "url": "https://www.masked.com",
+      "email": "masked@gmail.com"
+    },
+    "version": "2024a-2602030953-632cc6f0"
+  },
+  "servers": [
+    {
+      "url": "https://masked.mak/subscriber-api",
+      "description": "Generated server url"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Subscribers API",
+      "description": "Collection of Subscribers API methods"
+    }
+  ],
+  "paths": {
+    "/subscribers/api/v2": {
+      "get": {
+        "tags": [
+          "Subscribers API"
+        ],
+        "summary": "Get list of subscribers",
+        "description": "Returns list of subscribers",
+        "operationId": "GetSubscribers",
+        "parameters": [
+          {
+            "name": "supi",
+            "in": "query",
+            "description": "SUPI",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "example": "7805599329626733"
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "description": "Result offset",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 0
+            },
+            "example": 0
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Limit number of results",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32",
+              "default": 10
+            },
+            "example": 10
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Subscriber"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "subscriber-api": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Subscribers API"
+        ],
+        "summary": "Creates list of subscribers",
+        "description": "Creates list of subscribers",
+        "operationId": "CreateSubscribers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "subscriber-api": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "Subscribers API"
+        ],
+        "summary": "Deletes specific subscriber",
+        "description": "Deletes specific subscriber by given SUPI.",
+        "operationId": "DeleteSubscriber",
+        "parameters": [
+          {
+            "name": "supi",
+            "in": "query",
+            "description": "SUPI",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "311480143456796"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "subscriber-api": []
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Subscribers API"
+        ],
+        "summary": "Modifies list of subscribers",
+        "description": "Modifies list of subscribers",
+        "operationId": "ModifySubscribers",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/Subscriber"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Report"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "subscriber-api": []
+          }
+        ]
+      }
+    },
+    "/subscribers/api/v2/subscribersList": {
+      "get": {
+        "tags": [
+          "Subscribers API"
+        ],
+        "summary": "Get list of subscribers",
+        "description": "Return subscribers with same supi as passed",
+        "operationId": "getSubscribers",
+        "parameters": [
+          {
+            "name": "supiList",
+            "in": "query",
+            "description": "SUPI's",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/SubscribersList"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Subscriber"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "subscriber-api": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Subscribers API"
+        ],
+        "summary": "Get list of subscribers",
+        "description": "Return subscribers with same supi as passed",
+        "operationId": "getSubscribers_1",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Subscriber"
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorMessage"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "subscriber-api": []
+          }
+        ]
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "subscriber-api": {
+        "type": "oauth2",
+        "description": "OAuth2 security for Subscribers API",
+        "flows": {
+          "password": {
+            "tokenUrl": "https://masked.mak/keycloak/realms/masked/protocol/openid-connect/token",
+            "scopes": {}
+          }
+        }
+      }
+    },
+    "schemas": {
+      "Subscriber": {
+        "type": "object",
+        "properties": {
+          "supiType": {
+            "type": "string"
+          },
+          "supi": {
+            "type": "string",
+            "example": "311480143456796"
+          },
+          "plmnId": {
+            "type": "string",
+            "example": "31148"
+          },
+          "id": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "opKey": {
+            "type": "string",
+            "example": "01 12 14 88 35 05 29 36 25 36 71 79 58 32 13 63"
+          },
+          "opcKey": {
+            "type": "string",
+            "example": "32 67 17 53 41 28 42 08 11 74 80 32 74 94 64 71"
+          },
+          "authKey": {
+            "type": "string",
+            "example": "58 66 42 27 97 60 53 23 71 31 96 11 13 90 56 16"
+          },
+          "amfVal": {
+            "type": "string",
+            "example": "54 25"
+          },
+          "sqnVal": {
+            "type": "string",
+            "example": "32 42 44 01 48 10"
+          },
+          "ciphering": {
+            "type": "string",
+            "example": "NEA0"
+          },
+          "integrity": {
+            "type": "string",
+            "example": "NIA0"
+          },
+          "deviceName": {
+            "type": "string"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "homeAddress": {
+            "type": "string"
+          },
+          "city": {
+            "type": "string"
+          },
+          "created": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true
+          },
+          "modified": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true
+          },
+          "gpsi": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "profile": {
+            "type": "string"
+          },
+          "active": {
+            "type": "boolean"
+          },
+          "status": {
+            "type": "string"
+          },
+          "templateType": {
+            "$ref": "#/components/schemas/TemplateType"
+          },
+          "encPermanentKey": {
+            "type": "string"
+          },
+          "encOpcKey": {
+            "type": "string"
+          },
+          "dnnConfiguration": {
+            "type": "object",
+            "additionalProperties": {
+              "$ref": "#/components/schemas/DnnConfiguration"
+            }
+          },
+          "traceData": {
+            "$ref": "#/components/schemas/SubscriberInfoTraceData"
+          }
+        }
+      },
+      "ErrorMessage": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "Report": {
+        "type": "object",
+        "properties": {
+          "reportMessageList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReportMessage"
+            },
+            "uniqueItems": true
+          },
+          "referenceID": {
+            "type": "string"
+          },
+          "created": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "finished": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "user": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "templateName": {
+            "type": "string"
+          },
+          "multiple": {
+            "type": "boolean"
+          },
+          "done": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ReportMessage": {
+        "type": "object",
+        "properties": {
+          "supi": {
+            "type": "string",
+            "example": "7805599329626733"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "OK",
+              "NOK",
+              "PENDING"
+            ]
+          },
+          "defaultMessage": {
+            "type": "string",
+            "example": "Object missing"
+          },
+          "code": {
+            "type": "integer",
+            "format": "int32"
+          }
+        }
+      },
+      "SubscribersList": {
+        "type": "object",
+        "properties": {
+          "supis": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "TemplateType": {
+        "type": "object",
+        "properties": {
+          "typePolicyDataUesAmData": {
+            "type": "string"
+          },
+          "typePolicyDataUesSmData": {
+            "type": "string"
+          },
+          "typeAuthenticationDataAuthenticationSubscription": {
+            "type": "string"
+          },
+          "typeAuthenticationDataAmData": {
+            "type": "string"
+          },
+          "typeAuthenticationDataSmData": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "typeAuthenticationDataSmfSelectionSubscriptionData": {
+            "type": "string"
+          }
+        }
+      },
+      "DnnConfiguration": {
+        "type": "object",
+        "properties": {
+          "pduSessionTypes": {
+            "$ref": "#/components/schemas/PduSessionTypes"
+          },
+          "sscModes": {
+            "$ref": "#/components/schemas/SscModes"
+          },
+          "sessionAmbr": {
+            "$ref": "#/components/schemas/Ambr"
+          },
+          "qosTemplate": {
+            "type": "string"
+          },
+          "staticIpAddress": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/IpAddress"
+            },
+            "minItems": 1
+          },
+          "upSecurity": {
+            "$ref": "#/components/schemas/UpSecurity"
+          },
+          "ipv4FrameRouteList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FrameRouteInfo"
+            },
+            "minItems": 1
+          },
+          "ipv6FrameRouteList": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/FrameRouteInfo"
+            },
+            "minItems": 1
+          },
+          "5gQosProfile": {
+            "$ref": "#/components/schemas/SubscribedDefaultQos"
+          },
+          "3gppChargingCharacteristics": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "3gppChargingCharacteristics",
+          "5gQosProfile",
+          "ipv4FrameRouteList",
+          "ipv6FrameRouteList",
+          "sessionAmbr",
+          "staticIpAddress",
+          "upSecurity"
+        ]
+      },
+      "SubscriberInfoTraceData": {
+        "type": "object",
+        "properties": {
+          "timeStamp": {
+            "type": "number",
+            "format": "double"
+          },
+          "activated": {
+            "type": "boolean"
+          }
+        }
+      },
+      "IpAddress": {
+        "type": "object",
+        "properties": {
+          "ipv4Addr": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ipv6Addr": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ipv6Prefix": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ipv4Addr",
+          "ipv6Addr",
+          "ipv6Prefix"
+        ]
+      },
+      "UpSecurity": {
+        "type": "object",
+        "properties": {
+          "upIntegr": {
+            "type": "string",
+            "enum": [
+              "REQUIRED",
+              "PREFERRED",
+              "NOT_NEEDED"
+            ]
+          },
+          "upConfid": {
+            "type": "string",
+            "enum": [
+              "REQUIRED",
+              "PREFERRED",
+              "NOT_NEEDED"
+            ]
+          }
+        }
+      },
+      "FrameRouteInfo": {
+        "type": "object",
+        "properties": {
+          "ipV4Mask": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ipV6Prefix": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "ipV4Mask",
+          "ipV6Prefix"
+        ]
+      },
+      "PduSessionTypes": {
+        "type": "object",
+        "properties": {
+          "defaultSessionType": {
+            "type": "string",
+            "enum": [
+              "IPV4",
+              "IPV6",
+              "IPV4V6",
+              "UNSTRUCTURED",
+              "ETHERNET"
+            ],
+            "example": "IPV4"
+          },
+          "allowedSessionTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "IPV4",
+                "IPV6",
+                "IPV4V6",
+                "UNSTRUCTURED",
+                "ETHERNET"
+              ]
+            },
+            "example": [
+              "IPV4"
+            ],
+            "minItems": 1
+          }
+        },
+        "required": [
+          "allowedSessionTypes"
+        ]
+      },
+      "SscModes": {
+        "type": "object",
+        "properties": {
+          "defaultSscMode": {
+            "type": "string",
+            "enum": [
+              "SSC_MODE_1",
+              "SSC_MODE_2",
+              "SSC_MODE_3"
+            ]
+          },
+          "allowedSscModes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "SSC_MODE_1",
+                "SSC_MODE_2",
+                "SSC_MODE_3"
+              ]
+            }
+          }
+        }
+      },
+      "Ambr": {
+        "type": "object",
+        "properties": {
+          "uplink": {
+            "type": "string"
+          },
+          "downlink": {
+            "type": "string"
+          }
+        }
+      },
+      "SubscribedDefaultQos": {
+        "type": "object",
+        "properties": {
+          "arp": {
+            "$ref": "#/components/schemas/Arp"
+          },
+          "priorityLevel": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "5qi": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "required": [
+          "priorityLevel"
+        ]
+      },
+      "Arp": {
+        "type": "object",
+        "properties": {
+          "priorityLevel": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "preemptCap": {
+            "type": "string",
+            "enum": [
+              "NOT_PREEMPT",
+              "MAY_PREEMPT"
+            ],
+            "example": "NOT_PREEMPT"
+          },
+          "preemptVuln": {
+            "type": "string",
+            "enum": [
+              "NOT_PREEMPTABLE",
+              "PREEMPTABLE"
+            ],
+            "example": "NOT_PREEMPTABLE"
+          }
+        }
+      },
+      "AmbrRules": {
+        "type": "object",
+        "properties": {
+          "downlink": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "unit": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          },
+          "uplink": {
+            "type": "object",
+            "properties": {
+              "value": {
+                "type": "integer",
+                "format": "int32"
+              },
+              "unit": {
+                "type": "integer",
+                "format": "int32"
+              }
+            }
+          }
+        }
+      },
+      "Snssai": {
+        "type": "object",
+        "properties": {
+          "sst": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "sd": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "sd"
+        ]
+      }
+    }
+  }
+}

@@ -103,7 +103,12 @@ public class BodyGenerator {
 
         if (schema instanceof ArraySchema) {
             return generateFromArraySchema((ArraySchema) schema);
-        } else if (schema instanceof BinarySchema) {
+        }
+        // OpenAPI 3.1: schema may be generic Schema with type "array" rather than ArraySchema
+        if (Generators.isArrayType(schema) && schema.getItems() != null) {
+            return generateFromArrayLikeSchema(schema);
+        }
+        if (schema instanceof BinarySchema) {
             return generateFromBinarySchema((BinarySchema) schema, false);
         }
 
@@ -144,6 +149,22 @@ public class BodyGenerator {
             }
         }
 
+        return createJsonArrayWith(generate(schema.getItems()));
+    }
+
+    private String generateFromArrayLikeSchema(Schema<?> schema) {
+        if (schema.getExample() instanceof String) {
+            return (String) schema.getExample();
+        }
+        if (schema.getExample() instanceof Iterable) {
+            try {
+                return Json.mapper().writeValueAsString(schema.getExample());
+            } catch (JsonProcessingException e) {
+                LOGGER.warn(
+                        "Failed to encode Example Object. Falling back to default example generation",
+                        e);
+            }
+        }
         return createJsonArrayWith(generate(schema.getItems()));
     }
 

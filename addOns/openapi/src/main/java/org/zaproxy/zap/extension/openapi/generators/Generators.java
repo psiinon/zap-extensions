@@ -90,4 +90,20 @@ public class Generators {
         }
         return type;
     }
+
+    /**
+     * Returns true if the schema represents an array type. Handles OpenAPI 3.1 where type may be
+     * from {@code getTypes()} (e.g. {@code ["array", "null"]}) and {@code getType()} may be null or
+     * return another value from the set.
+     */
+    public static boolean isArrayType(Schema<?> schema) {
+        if (schema == null) {
+            return false;
+        }
+        if ("array".equals(schema.getType())) {
+            return true;
+        }
+        Set<String> types = schema.getTypes();
+        return types != null && types.contains("array");
+    }
 }

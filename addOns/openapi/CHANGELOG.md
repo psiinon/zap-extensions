@@ -4,7 +4,9 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
-
+### Fixed
+- POST request bodies with array schema (e.g. OpenAPI 3.1) now generate a JSON array instead of a single placeholder value when importing a definition from file.
+- When importing from file, use the original definition content so request body schema structure (including array types) is preserved.
 
 ## [52] - 2026-02-11
 ### Changed

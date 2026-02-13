@@ -27,8 +27,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import io.swagger.v3.core.util.Json;
 import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.media.Schema;
+import io.swagger.v3.oas.models.media.StringSchema;
 import io.swagger.v3.parser.OpenAPIV3Parser;
 import io.swagger.v3.parser.core.models.ParseOptions;
 import java.io.IOException;
@@ -79,6 +82,109 @@ class BodyGeneratorUnitTest extends TestUtils {
                                         .get(0)
                                         .getSchema());
         assertEquals("[\"John Doe\",\"John Doe\"]", jsonArray);
+    }
+
+    @Test
+    void shouldGenerateArrayBodyWhenSchemaHasTypeArrayAndItems() {
+        // OpenAPI 3.1 can represent array as Schema with type "array" rather than ArraySchema
+        Schema<?> arrayLikeSchema = new Schema<>();
+        arrayLikeSchema.setType("array");
+        arrayLikeSchema.setItems(new StringSchema());
+        String body = generators.getBodyGenerator().generate(arrayLikeSchema);
+        assertThat(body, is("[\"John Doe\",\"John Doe\"]"));
+    }
+
+    @Test
+    void shouldGenerateArrayBodyForOpenApi31TypeArrays2Spec() throws IOException {
+        // openapi_31_type_arrays2.json has POST request bodies with schema type array
+        OpenAPI openAPI = parseResource("openapi_31_type_arrays2.json");
+        io.swagger.v3.oas.models.media.MediaType mediaType =
+                openAPI.getPaths()
+                        .get("/subscribers/api/v2")
+                        .getPost()
+                        .getRequestBody()
+                        .getContent()
+                        .get("application/json");
+        String body = generators.getBodyGenerator().generate(mediaType);
+        assertThat("POST body must be a JSON array", body.startsWith("["), is(true));
+        assertThat("POST body must end with ]", body.endsWith("]"), is(true));
+        assertThat(
+                "POST body must not be a single string like John Doe",
+                body.equals("\"John Doe\""),
+                is(false));
+    }
+
+    @Test
+    void shouldGeneratePostSubscribersApiV2BodyAsArrayOfTwoSubscriberObjects() throws Exception {
+        OpenAPI openAPI = parseResource("openapi_31_type_arrays2.json");
+        io.swagger.v3.oas.models.media.MediaType mediaType =
+                openAPI.getPaths()
+                        .get("/subscribers/api/v2")
+                        .getPost()
+                        .getRequestBody()
+                        .getContent()
+                        .get("application/json");
+        String body = generators.getBodyGenerator().generate(mediaType);
+
+        JsonNode root = Json.mapper().readTree(body);
+        assertTrue(root.isArray(), "Body must be a JSON array");
+        assertEquals(2, root.size(), "Body must contain two array elements");
+
+        JsonNode first = root.get(0);
+        JsonNode second = root.get(1);
+        assertTrue(first.isObject(), "First element must be an object");
+        assertTrue(second.isObject(), "Second element must be an object");
+
+        // Schema example values from Subscriber
+        assertEquals("311480143456796", first.get("supi").asText());
+        assertEquals("31148", first.get("plmnId").asText());
+        assertEquals(
+                "01 12 14 88 35 05 29 36 25 36 71 79 58 32 13 63", first.get("opKey").asText());
+        assertEquals(
+                "32 67 17 53 41 28 42 08 11 74 80 32 74 94 64 71", first.get("opcKey").asText());
+        assertEquals("NEA0", first.get("ciphering").asText());
+        assertEquals("NIA0", first.get("integrity").asText());
+
+        // Default/example values for primitive types
+        assertEquals(10, first.get("id").asInt());
+        assertTrue(first.get("active").asBoolean());
+
+        // Second element is same structure (createJsonArrayWith duplicates the item)
+        assertEquals("311480143456796", second.get("supi").asText());
+        assertEquals("31148", second.get("plmnId").asText());
+        assertEquals(10, second.get("id").asInt());
+    }
+
+    @Test
+    void shouldGeneratePostSubscribersApiV2BodyWithExpectedSubscriberFields() throws Exception {
+        OpenAPI openAPI = parseResource("openapi_31_type_arrays2.json");
+        io.swagger.v3.oas.models.media.MediaType mediaType =
+                openAPI.getPaths()
+                        .get("/subscribers/api/v2")
+                        .getPost()
+                        .getRequestBody()
+                        .getContent()
+                        .get("application/json");
+        String body = generators.getBodyGenerator().generate(mediaType);
+
+        JsonNode first = Json.mapper().readTree(body).get(0);
+        // Subscriber schema property names from openapi_31_type_arrays2.json
+        assertTrue(first.has("supiType"));
+        assertTrue(first.has("supi"));
+        assertTrue(first.has("plmnId"));
+        assertTrue(first.has("id"));
+        assertTrue(first.has("opKey"));
+        assertTrue(first.has("opcKey"));
+        assertTrue(first.has("authKey"));
+        assertTrue(first.has("amfVal"));
+        assertTrue(first.has("sqnVal"));
+        assertTrue(first.has("ciphering"));
+        assertTrue(first.has("integrity"));
+        assertTrue(first.has("deviceName"));
+        assertTrue(first.has("firstName"));
+        assertTrue(first.has("lastName"));
+        assertTrue(first.has("active"));
+        assertTrue(first.has("status"));
     }
 
     @Test
