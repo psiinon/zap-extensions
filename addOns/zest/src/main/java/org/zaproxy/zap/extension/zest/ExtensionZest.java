@@ -44,6 +44,7 @@ import javax.swing.JToolBar;
 import net.htmlparser.jericho.Source;
 import net.sf.json.JSONObject;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.WebDriver;
@@ -1556,6 +1557,9 @@ public class ExtensionZest extends ExtensionAdaptor implements ProxyListener, Sc
     }
 
     public ZestElement convertStringToElement(String string) {
+        if (StringUtils.isBlank(string)) {
+            return null;
+        }
         return "YAML".equals(getParam().getScriptFormat())
                 ? ZestYaml.fromString(string)
                 : ZestJSON.fromString(string);
