@@ -25,6 +25,31 @@ import java.util.Map;
 
 /** A standard set of alert tags. */
 public enum CommonAlertTag {
+    // OWASP Top 10 2025
+    OWASP_2025_A01_BROKEN_AC(
+            "OWASP_2025_A01", "https://owasp.org/Top10/2025/A01_2025-Broken_Access_Control/"),
+    OWASP_2025_A02_SEC_MISCONFIG(
+            "OWASP_2025_A02", "https://owasp.org/Top10/2025/A02_2025-Security_Misconfiguration/"),
+    OWASP_2025_A03_SUPPLY_CHAIN(
+            "OWASP_2025_A03",
+            "https://owasp.org/Top10/2025/A03_2025-Software_Supply_Chain_Failures/"),
+    OWASP_2025_A04_CRYPTO_FAIL(
+            "OWASP_2025_A04", "https://owasp.org/Top10/2025/A04_2025-Cryptographic_Failures/"),
+    OWASP_2025_A05_INJECTION("OWASP_2025_A05", "https://owasp.org/Top10/2025/A05_2025-Injection/"),
+    OWASP_2025_A06_INSECURE_DESIGN(
+            "OWASP_2025_A06", "https://owasp.org/Top10/2025/A06_2025-Insecure_Design/"),
+    OWASP_2025_A07_AUTH_FAIL(
+            "OWASP_2025_A07", "https://owasp.org/Top10/2025/A07_2025-Authentication_Failures/"),
+    OWASP_2025_A08_INTEGRITY_FAIL(
+            "OWASP_2025_A08",
+            "https://owasp.org/Top10/2025/A08_2025-Software_or_Data_Integrity_Failures/"),
+    OWASP_2025_A09_LOGGING_ALERTING(
+            "OWASP_2025_A09",
+            "https://owasp.org/Top10/2025/A09_2025-Security_Logging_and_Alerting_Failures/"),
+    OWASP_2025_A10_EXCEPTIONAL_CONDITIONS(
+            "OWASP_2025_A10",
+            "https://owasp.org/Top10/2025/A10_2025-Mishandling_of_Exceptional_Conditions/"),
+
     // OWASP Top 10 2021
     OWASP_2021_A01_BROKEN_AC(
             "OWASP_2021_A01", "https://owasp.org/Top10/A01_2021-Broken_Access_Control/"),
@@ -374,6 +399,39 @@ public enum CommonAlertTag {
     WSTG_V42_APIT_01_GRAPHQL(
             "WSTG-v42-APIT-01",
             "https://owasp.org/www-project-web-security-testing-guide/v42/4-Web_Application_Security_Testing/12-API_Testing/01-Testing_GraphQL"),
+
+    // OWASP API Security Top 10 2023
+    API_2023_API1_BROKEN_OBJECT_LEVEL_AUTHZ(
+            "API_2023_API1",
+            "https://owasp.org/API-Security/editions/2023/en/0xa1-broken-object-level-authorization/"),
+    API_2023_API2_BROKEN_AUTH(
+            "API_2023_API2",
+            "https://owasp.org/API-Security/editions/2023/en/0xa2-broken-authentication/"),
+    API_2023_API3_BROKEN_OBJECT_PROPERTY_LEVEL_AUTHZ(
+            "API_2023_API3",
+            "https://owasp.org/API-Security/editions/2023/en/0xa3-broken-object-property-level-authorization/"),
+    API_2023_API4_UNRESTRICTED_RESOURCE_CONSUMPTION(
+            "API_2023_API4",
+            "https://owasp.org/API-Security/editions/2023/en/0xa4-unrestricted-resource-consumption/"),
+    API_2023_API5_BROKEN_FUNCTION_LEVEL_AUTHZ(
+            "API_2023_API5",
+            "https://owasp.org/API-Security/editions/2023/en/0xa5-broken-function-level-authorization/"),
+    API_2023_API6_UNRESTRICTED_SENSITIVE_BUSINESS_FLOWS(
+            "API_2023_API6",
+            "https://owasp.org/API-Security/editions/2023/en/0xa6-unrestricted-access-to-sensitive-business-flows/"),
+    API_2023_API7_SSRF(
+            "API_2023_API7",
+            "https://owasp.org/API-Security/editions/2023/en/0xa7-server-side-request-forgery/"),
+    API_2023_API8_SEC_MISCONFIG(
+            "API_2023_API8",
+            "https://owasp.org/API-Security/editions/2023/en/0xa8-security-misconfiguration/"),
+    API_2023_API9_IMPROPER_INVENTORY(
+            "API_2023_API9",
+            "https://owasp.org/API-Security/editions/2023/en/0xa9-improper-inventory-management/"),
+    API_2023_API10_UNSAFE_CONSUMPTION(
+            "API_2023_API10",
+            "https://owasp.org/API-Security/editions/2023/en/0xaa-unsafe-consumption-of-apis/"),
+
     /**
      * This Alert Tag is used to indicate (Ex: via Example Alerts) alerts (rules) which support user
      * defined payloads via Custom Payloads.
