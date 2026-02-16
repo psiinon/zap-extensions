@@ -31,6 +31,7 @@ import org.parosproxy.paros.extension.ExtensionHook;
 import org.parosproxy.paros.extension.ExtensionHookMenu;
 import org.parosproxy.paros.extension.ExtensionHookView;
 import org.parosproxy.paros.model.HistoryReference;
+import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.requester.internal.AbstractHttpMessageEditorDialog;
@@ -104,7 +105,9 @@ public class ExtensionRequester extends ExtensionAdaptor {
         if (hasView()) {
             sendDialog =
                     new SendHttpMessageEditorDialog(
-                            this, new ManualHttpRequestEditorPanel("manual"));
+                            this,
+                            new ManualHttpRequestEditorPanel(
+                                    Model.getSingleton().getOptionsParam().getConfig(), "manual"));
             sendDialog.load(extensionHook);
 
             extensionHook.addOptionsChangedListener(getRequesterPanel());
@@ -181,7 +184,8 @@ public class ExtensionRequester extends ExtensionAdaptor {
 
     private RequesterPanel getRequesterPanel() {
         if (requesterPanel == null) {
-            requesterPanel = new RequesterPanel(this);
+            requesterPanel =
+                    new RequesterPanel(this, Model.getSingleton().getOptionsParam().getConfig());
         }
         return requesterPanel;
     }
@@ -212,6 +216,13 @@ public class ExtensionRequester extends ExtensionAdaptor {
     @Override
     public boolean canUnload() {
         return true;
+    }
+
+    @Override
+    public void stop() {
+        if (hasView()) {
+            getRequesterPanel().checkSaveConfigs();
+        }
     }
 
     @Override
