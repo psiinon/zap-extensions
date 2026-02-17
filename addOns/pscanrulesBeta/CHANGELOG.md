@@ -3,7 +3,7 @@ All notable changes to this add-on will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## Unreleased
+## [49] - 2026-02-17
 ### Changed
 - Insufficient Site Isolation Against Spectre Vulnerability alerts to have unique alert names.
 
@@ -394,6 +394,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 - Updated to support new addon format
 
+[49]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v49
 [48]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v48
 [47]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v47
 [46]: https://github.com/zaproxy/zap-extensions/releases/pscanrulesBeta-v46
