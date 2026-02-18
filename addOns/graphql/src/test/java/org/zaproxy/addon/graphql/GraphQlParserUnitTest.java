@@ -122,7 +122,7 @@ class GraphQlParserUnitTest extends TestUtils {
     }
 
     @Test
-    void shouldImportIntrospectionResponse() throws Exception {
+    void shouldImportIntrospectionResponseFromFile() throws Exception {
         // Given
         GraphQlParser gqp = spy(new GraphQlParser(endpointUrl));
         var schemaCaptor = ArgumentCaptor.forClass(String.class);
@@ -135,6 +135,27 @@ class GraphQlParserUnitTest extends TestUtils {
         Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
         // When
         gqp.importFile(getResourcePath("introspectionResponse.json").toString());
+        // Then
+        verify(gqp).parse(schemaCaptor.capture());
+        assertThat(schemaCaptor.getValue(), containsString(expectedSchema));
+    }
+
+    @Test
+    void shouldImportIntrospectionResponseFromUrl() throws Exception {
+        // Given
+        String introspectionResponse = getHtml("introspectionResponse.json");
+        nano.addHandler(new StaticContentServerHandler("/schema.json", introspectionResponse));
+        GraphQlParser gqp = spy(new GraphQlParser(endpointUrl));
+        var schemaCaptor = ArgumentCaptor.forClass(String.class);
+        String expectedSchema =
+                "type Query {\n"
+                        + "  searchSongsByLyrics(lyrics: String = \"Never gonna give you up\"): String\n"
+                        + "}";
+        var extCommonLib = mock(ExtensionCommonlib.class);
+        when(extCommonLib.getValueProvider()).thenReturn(new DefaultValueProvider());
+        Control.getSingleton().getExtensionLoader().addExtension(extCommonLib);
+        // When
+        gqp.importUrl(endpointUrl + "/schema.json");
         // Then
         verify(gqp).parse(schemaCaptor.capture());
         assertThat(schemaCaptor.getValue(), containsString(expectedSchema));
