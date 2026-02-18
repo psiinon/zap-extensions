@@ -84,6 +84,7 @@ import org.zaproxy.addon.authhelper.internal.AuthenticationStep;
 import org.zaproxy.addon.authhelper.internal.auth.Authenticator;
 import org.zaproxy.addon.authhelper.internal.auth.DefaultAuthenticator;
 import org.zaproxy.addon.authhelper.internal.auth.MsLoginAuthenticator;
+import org.zaproxy.addon.commonlib.AuthConstants;
 import org.zaproxy.addon.commonlib.ResourceIdentificationUtils;
 import org.zaproxy.addon.network.NetworkUtils;
 import org.zaproxy.zap.authentication.AuthenticationCredentials;
@@ -1489,6 +1490,14 @@ public class AuthUtils {
             authSender.sendAndReceive(authMsg, true);
             historyProvider.addAuthMessageToHistory(authMsg);
 
+            if (!authMsg.getResponseHeader().isHtml()) {
+                LOGGER.debug(
+                        "Response to {} is no good as a login link verification req, authenticated request is not HTML {}",
+                        testUri,
+                        authMsg.getResponseHeader().getNormalisedContentTypeValue());
+                return false;
+            }
+
             String authBody = authMsg.getResponseBody().toString();
             if (authBody.contains(link)) {
                 LOGGER.debug(
@@ -1497,14 +1506,35 @@ public class AuthUtils {
                         link);
                 return false;
             }
-            LOGGER.debug(
-                    "Found good login link verification req {}, contains login link {}",
+
+            elements =
+                    LoginLinkDetector.getLoginLinks(
+                            new Source(authBody), AuthConstants.getLogoutIndicators());
+            if (elements.isEmpty()) {
+                LOGGER.debug(
+                        "Response to {} is no good as a login link verification req, no logout link found in authenticated request",
+                        testUri);
+                return false;
+            }
+            String logoutLink = elements.get(0).toString();
+            if (unauthBody.contains(logoutLink)) {
+                LOGGER.debug(
+                        "Response to {} is no good as a login link verification req, the unauthenticated request also includes the logout link {}",
+                        testUri,
+                        logoutLink);
+                return false;
+            }
+
+            LOGGER.info(
+                    "Found good login link verification req {}, contains login link {} and logout link {}",
                     testUri,
-                    link);
+                    link,
+                    logoutLink);
 
             AuthenticationMethod authMethod = user.getContext().getAuthenticationMethod();
             authMethod.setAuthCheckingStrategy(AuthCheckingStrategy.POLL_URL);
             authMethod.setPollUrl(testUri.toString());
+            authMethod.setLoggedInIndicatorPattern(Pattern.quote(logoutLink));
             authMethod.setLoggedOutIndicatorPattern(Pattern.quote(link));
             return true;
 

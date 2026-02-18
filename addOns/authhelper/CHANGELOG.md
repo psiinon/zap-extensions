@@ -6,6 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 ### Fixed
 - Exception in authentication diagnostics.
+- Ensure the login link verification URL has both logged in and out indicators.
 
 ### Changed
 - Maintenance changes.

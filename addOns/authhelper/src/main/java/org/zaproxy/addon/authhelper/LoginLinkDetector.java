@@ -19,6 +19,7 @@
  */
 package org.zaproxy.addon.authhelper;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import net.htmlparser.jericho.Element;
@@ -101,7 +102,7 @@ public class LoginLinkDetector {
         return searchTexts.stream().anyMatch(txt::contains);
     }
 
-    public static List<Element> getLoginLinks(Source src, List<String> loginLabels) {
+    public static List<Element> getLoginLinks(Source src, Collection<String> loginLabels) {
         // Try finding links first
         List<Element> loginLinks = findElementsByTagAndLabels(src, HTMLElementName.A, loginLabels);
         if (!loginLinks.isEmpty()) {
@@ -126,13 +127,13 @@ public class LoginLinkDetector {
     }
 
     private static List<Element> findElementsByTagAndLabels(
-            Source src, String tag, List<String> labels) {
+            Source src, String tag, Collection<String> labels) {
         return src.getAllElements(tag).stream()
                 .filter(element -> elementContainsText(element, labels))
                 .toList();
     }
 
-    private static boolean elementContainsText(Element element, List<String> searchTexts) {
+    private static boolean elementContainsText(Element element, Collection<String> searchTexts) {
         String txt = element.getTextExtractor().toString().toLowerCase(Locale.ROOT);
         return searchTexts.stream().anyMatch(txt::contains);
     }
