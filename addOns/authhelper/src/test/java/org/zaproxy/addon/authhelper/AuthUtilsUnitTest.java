@@ -28,7 +28,9 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -1504,6 +1506,38 @@ class AuthUtilsUnitTest extends TestUtils {
             verifyNoInteractions(authSender);
             // First message sent is notified as well.
             verify(historyProvider, times(2)).addAuthMessageToHistory(any(HttpMessage.class));
+        }
+
+        @Test
+        void shouldConfigureContext() throws Exception {
+            // Given
+            handler =
+                    session ->
+                            newFixedLengthResponse(
+                                    Status.OK, NanoHTTPD.MIME_HTML, "<a href='/login'>Login</a>");
+            given(authenticationMethod.getAuthCheckingStrategy())
+                    .willReturn(AuthCheckingStrategy.AUTO_DETECT);
+            doAnswer(
+                            invocation -> {
+                                HttpMessage authMessage = invocation.getArgument(0);
+                                authMessage
+                                        .getResponseHeader()
+                                        .setHeader(HttpFieldsNames.CONTENT_TYPE, "text/html");
+                                authMessage.setResponseBody("<a href='/logout'>Logout</a>");
+
+                                return null;
+                            })
+                    .when(authSender)
+                    .sendAndReceive(any(), eq(true));
+            // When
+            AuthUtils.checkLoginLinkVerification(authSender, user, url);
+            // Then
+            verify(authenticationMethod).setAuthCheckingStrategy(AuthCheckingStrategy.POLL_URL);
+            verify(authenticationMethod).setPollUrl(url);
+            verify(authenticationMethod)
+                    .setLoggedInIndicatorPattern("\\Q<a href='/logout'>Logout</a>\\E");
+            verify(authenticationMethod)
+                    .setLoggedOutIndicatorPattern("\\Q<a href='/login'>Login</a>\\E");
         }
     }
 
