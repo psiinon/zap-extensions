@@ -126,7 +126,11 @@ public class GraphQlParser {
     public void importUrl(URI schemaUrl) throws IOException {
         HttpMessage importMessage = new HttpMessage(schemaUrl);
         requestor.send(importMessage);
-        parse(importMessage.getResponseBody().toString());
+        String schema = importMessage.getResponseBody().toString();
+        if (schema.stripLeading().startsWith("{")) {
+            schema = getSchemaFromIntrospectionResponse(schema);
+        }
+        parse(schema);
         Stats.incCounter(GraphQlStats.SCHEMA_URL_IMPORTED);
     }
 
