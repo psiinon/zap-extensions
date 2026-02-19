@@ -56,6 +56,7 @@ import org.zaproxy.addon.automation.AutomationPlan;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ExtensionAutomation;
 import org.zaproxy.addon.automation.tests.AbstractAutomationTest;
+import org.zaproxy.addon.commonlib.ui.TabbedOutputPanel;
 import org.zaproxy.zap.ZAP;
 import org.zaproxy.zap.eventBus.Event;
 import org.zaproxy.zap.eventBus.EventConsumer;
@@ -207,6 +208,11 @@ public class AutomationPanel extends AbstractPanel implements EventConsumer {
                         runPlanButton.setEnabled(false);
                         getStopPlanButton().setEnabled(true);
                         ext.runPlanAsync(currentPlan);
+                        if (View.getSingleton().getOutputPanel()
+                                instanceof TabbedOutputPanel tabbedPanel) {
+                            tabbedPanel.setSelectedOutputTab(ext.getOutputSource().getName());
+                            tabbedPanel.setTabFocus();
+                        }
                     });
         }
         return runPlanButton;
