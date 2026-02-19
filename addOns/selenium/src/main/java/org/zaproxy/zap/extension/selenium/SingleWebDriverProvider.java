@@ -85,4 +85,11 @@ public interface SingleWebDriverProvider {
      * @return
      */
     boolean isConfigured();
+
+    /**
+     * Returns true if the browser was added by a user or ZAP add-on.
+     *
+     * @return
+     */
+    boolean isCustom();
 }

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Changed
 - Update Selenium to version 4.40.0.
+### Removed
+- Support for IE and disabled Safari.
 
 ## [15.43.0] - 2025-12-15
 ### Changed

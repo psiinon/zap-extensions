@@ -42,6 +42,15 @@ public class BuiltInSingleWebDriverProvider implements SingleWebDriverProvider {
         this.providedBrowser = new ProvidedBrowserImpl();
     }
 
+    /**
+     * Gets the built-in browser this provider supplies.
+     *
+     * @return the browser
+     */
+    public Browser getBrowser() {
+        return browser;
+    }
+
     @Override
     public String getId() {
         return browser.getId();
@@ -73,6 +82,11 @@ public class BuiltInSingleWebDriverProvider implements SingleWebDriverProvider {
     @Override
     public boolean isConfigured() {
         return ExtensionSelenium.isConfigured(browser);
+    }
+
+    @Override
+    public boolean isCustom() {
+        return false;
     }
 
     private class ProvidedBrowserImpl implements ProvidedBrowser {
