@@ -45,6 +45,7 @@ import org.parosproxy.paros.Constant;
 import org.zaproxy.zap.common.VersionedAbstractParam;
 import org.zaproxy.zap.extension.api.ZapApiIgnore;
 import org.zaproxy.zap.extension.selenium.internal.BrowserArgument;
+import org.zaproxy.zap.extension.selenium.internal.BrowserPreference;
 import org.zaproxy.zap.extension.selenium.internal.CustomBrowserImpl;
 
 /**
@@ -110,10 +111,12 @@ public class SeleniumOptions extends VersionedAbstractParam {
     private static final String CHROME_BINARY_KEY = SELENIUM_BASE_KEY + ".chromeBinary";
 
     private static final String CHROME_ARGS_KEY = SELENIUM_BASE_KEY + ".chromeArgs.arg";
+    private static final String CHROME_PREFS_KEY = SELENIUM_BASE_KEY + ".chromePrefs.pref";
 
     private static final String EDGE_BINARY_KEY = SELENIUM_BASE_KEY + ".edgeBinary";
 
     private static final String EDGE_ARGS_KEY = SELENIUM_BASE_KEY + ".edgeArgs.arg";
+    private static final String EDGE_PREFS_KEY = SELENIUM_BASE_KEY + ".edgePrefs.pref";
 
     private static final String ARG_KEY = "argument";
     private static final String ARGS_KEY = "args.arg";
@@ -122,9 +125,14 @@ public class SeleniumOptions extends VersionedAbstractParam {
     private static final String ENABLED_KEY = "enabled";
     private static final String NAME_KEY = "name";
     private static final String TYPE_KEY = "browserType";
+    private static final String PREFS_KEY = "prefs.pref";
+    private static final String PREF_NAME_KEY = "name";
+    private static final String PREF_VALUE_KEY = "value";
 
     private static final String CONFIRM_REMOVE_BROWSER_ARG =
             SELENIUM_BASE_KEY + ".confirmRemoveBrowserArg";
+    private static final String CONFIRM_REMOVE_BROWSER_PREF =
+            SELENIUM_BASE_KEY + ".confirmRemoveBrowserPref";
 
     /** The configuration key to read/write the path to ChromeDriver. */
     private static final String CHROME_DRIVER_KEY = SELENIUM_BASE_KEY + ".chromeDriver";
@@ -135,6 +143,7 @@ public class SeleniumOptions extends VersionedAbstractParam {
     private static final String FIREFOX_BINARY_KEY = SELENIUM_BASE_KEY + ".firefoxBinary";
 
     private static final String FIREFOX_ARGS_KEY = SELENIUM_BASE_KEY + ".firefoxArgs.arg";
+    private static final String FIREFOX_PREFS_KEY = SELENIUM_BASE_KEY + ".firefoxPrefs.pref";
 
     /** The configuration key to read/write the path Firefox driver (geckodriver). */
     private static final String FIREFOX_DRIVER_KEY = SELENIUM_BASE_KEY + ".firefoxDriver";
@@ -173,6 +182,8 @@ public class SeleniumOptions extends VersionedAbstractParam {
 
     private Map<String, List<BrowserArgument>> browserArguments = new HashMap<>();
     private boolean confirmRemoveBrowserArgument = true;
+    private Map<String, List<BrowserPreference>> browserPreferences = new HashMap<>();
+    private boolean confirmRemoveBrowserPreference = true;
     private List<CustomBrowserImpl> customBrowsers =
             Collections.synchronizedList(new ArrayList<>());
 
@@ -182,6 +193,9 @@ public class SeleniumOptions extends VersionedAbstractParam {
         browserArguments.put(Browser.CHROME.getId(), new ArrayList<>(0));
         browserArguments.put(Browser.EDGE.getId(), new ArrayList<>(0));
         browserArguments.put(Browser.FIREFOX.getId(), new ArrayList<>(0));
+        browserPreferences.put(Browser.CHROME.getId(), new ArrayList<>(0));
+        browserPreferences.put(Browser.EDGE.getId(), new ArrayList<>(0));
+        browserPreferences.put(Browser.FIREFOX.getId(), new ArrayList<>(0));
         customBrowsers = Collections.synchronizedList(new ArrayList<>());
     }
 
@@ -235,6 +249,13 @@ public class SeleniumOptions extends VersionedAbstractParam {
         browserArguments.put(Browser.FIREFOX.getId(), readBrowserArguments(FIREFOX_ARGS_KEY));
 
         confirmRemoveBrowserArgument = getBoolean(CONFIRM_REMOVE_BROWSER_ARG, true);
+
+        browserPreferences = new HashMap<>();
+        browserPreferences.put(Browser.CHROME.getId(), readBrowserPreferences(CHROME_PREFS_KEY));
+        browserPreferences.put(Browser.EDGE.getId(), readBrowserPreferences(EDGE_PREFS_KEY));
+        browserPreferences.put(Browser.FIREFOX.getId(), readBrowserPreferences(FIREFOX_PREFS_KEY));
+
+        confirmRemoveBrowserPreference = getBoolean(CONFIRM_REMOVE_BROWSER_PREF, true);
 
         customBrowsers = readCustomBrowsers();
     }
@@ -640,7 +661,7 @@ public class SeleniumOptions extends VersionedAbstractParam {
     private void validateBrowser(String browser) {
         if (!browserArguments.containsKey(browser)) {
             throw new IllegalArgumentException(
-                    "Browser should be one of: " + browserArguments.keySet());
+                    "Browser " + browser + " should be one of " + browserArguments.keySet());
         }
     }
 
@@ -735,6 +756,108 @@ public class SeleniumOptions extends VersionedAbstractParam {
         return arguments;
     }
 
+    void setConfirmRemoveBrowserPreference(boolean confirmRemove) {
+        this.confirmRemoveBrowserPreference = confirmRemove;
+        getConfig().setProperty(CONFIRM_REMOVE_BROWSER_PREF, confirmRemoveBrowserPreference);
+    }
+
+    boolean isConfirmRemoveBrowserPreference() {
+        return confirmRemoveBrowserPreference;
+    }
+
+    List<BrowserPreference> getBrowserPreferences(String browser) {
+        validateBrowser(browser);
+        return Collections.unmodifiableList(browserPreferences.get(browser));
+    }
+
+    void addBrowserPreference(String browser, BrowserPreference preference) {
+        validateBrowser(browser);
+        Objects.requireNonNull(preference);
+        getBrowserPreferencesImpl(browser).add(preference);
+        persistBrowserPreferences(browser);
+    }
+
+    private List<BrowserPreference> getBrowserPreferencesImpl(String browser) {
+        return browserPreferences.computeIfAbsent(browser, e -> new ArrayList<>());
+    }
+
+    boolean setBrowserPreferenceEnabled(String browser, String name, boolean enabled) {
+        validateBrowser(browser);
+        String trimmedName = Objects.requireNonNull(name).trim();
+        for (Iterator<BrowserPreference> it = getBrowserPreferencesImpl(browser).iterator();
+                it.hasNext(); ) {
+            BrowserPreference pref = it.next();
+            if (trimmedName.equals(pref.getName())) {
+                pref.setEnabled(enabled);
+                persistBrowserPreferences(browser);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    boolean removeBrowserPreference(String browser, String name) {
+        validateBrowser(browser);
+        String trimmedName = Objects.requireNonNull(name).trim();
+        for (Iterator<BrowserPreference> it = getBrowserPreferencesImpl(browser).iterator();
+                it.hasNext(); ) {
+            if (trimmedName.equals(it.next().getName())) {
+                it.remove();
+                persistBrowserPreferences(browser);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    void setBrowserPreferences(String browser, List<BrowserPreference> preferences) {
+        validateBrowser(browser);
+        browserPreferences.put(browser, copyPreferences(preferences));
+        persistBrowserPreferences(browser);
+    }
+
+    private static List<BrowserPreference> copyPreferences(List<BrowserPreference> preferences) {
+        Objects.requireNonNull(preferences);
+        return preferences.stream().map(BrowserPreference::new).collect(Collectors.toList());
+    }
+
+    private void persistBrowserPreferences(String browser) {
+        String baseKey =
+                switch (Browser.getBrowserWithId(browser)) {
+                    case CHROME -> CHROME_PREFS_KEY;
+                    case EDGE -> EDGE_PREFS_KEY;
+                    default -> FIREFOX_PREFS_KEY;
+                };
+        List<BrowserPreference> preferences = browserPreferences.get(browser);
+        ((HierarchicalConfiguration) getConfig()).clearTree(baseKey);
+        for (int i = 0, size = preferences.size(); i < size; ++i) {
+            String elementBaseKey = baseKey + "(" + i + ").";
+            BrowserPreference pref = preferences.get(i);
+            getConfig().setProperty(elementBaseKey + PREF_NAME_KEY, pref.getName());
+            getConfig().setProperty(elementBaseKey + PREF_VALUE_KEY, pref.getValue());
+            getConfig().setProperty(elementBaseKey + ENABLED_KEY, pref.isEnabled());
+        }
+    }
+
+    private List<BrowserPreference> readBrowserPreferences(String baseKey) {
+        List<HierarchicalConfiguration> fields =
+                ((HierarchicalConfiguration) getConfig()).configurationsAt(baseKey);
+        List<BrowserPreference> preferences = new ArrayList<>(fields.size());
+        for (HierarchicalConfiguration sub : fields) {
+            try {
+                String name = sub.getString(PREF_NAME_KEY, "").trim();
+                if (!name.isEmpty()) {
+                    String value = sub.getString(PREF_VALUE_KEY, "");
+                    preferences.add(
+                            new BrowserPreference(name, value, sub.getBoolean(ENABLED_KEY, true)));
+                }
+            } catch (ConversionException e) {
+                LOGGER.warn("An error occurred while reading the browser preference:", e);
+            }
+        }
+        return preferences;
+    }
+
     /**
      * Gets the list of custom browsers.
      *
@@ -798,6 +921,16 @@ public class SeleniumOptions extends VersionedAbstractParam {
                     getConfig().setProperty(argElementBaseKey + ARG_KEY, arg.getArgument());
                     getConfig().setProperty(argElementBaseKey + ENABLED_KEY, arg.isEnabled());
                 }
+
+                String prefsBaseKey = elementBaseKey + PREFS_KEY;
+                List<BrowserPreference> preferences = browser.getPreferences();
+                for (int j = 0, prefsSize = preferences.size(); j < prefsSize; ++j) {
+                    String prefElementBaseKey = prefsBaseKey + "(" + j + ").";
+                    BrowserPreference pref = preferences.get(j);
+                    getConfig().setProperty(prefElementBaseKey + PREF_NAME_KEY, pref.getName());
+                    getConfig().setProperty(prefElementBaseKey + PREF_VALUE_KEY, pref.getValue());
+                    getConfig().setProperty(prefElementBaseKey + ENABLED_KEY, pref.isEnabled());
+                }
             }
         }
     }
@@ -848,9 +981,32 @@ public class SeleniumOptions extends VersionedAbstractParam {
                 } catch (Exception e) {
                     LOGGER.warn("An error occurred while reading custom browser arguments:", e);
                 }
+
+                List<BrowserPreference> preferences = new ArrayList<>();
+                try {
+                    List<HierarchicalConfiguration> prefFields = sub.configurationsAt(PREFS_KEY);
+                    for (HierarchicalConfiguration prefSub : prefFields) {
+                        try {
+                            String prefName = prefSub.getString(PREF_NAME_KEY, "").trim();
+                            if (!prefName.isEmpty()) {
+                                String prefValue = prefSub.getString(PREF_VALUE_KEY, "");
+                                preferences.add(
+                                        new BrowserPreference(
+                                                prefName,
+                                                prefValue,
+                                                prefSub.getBoolean(ENABLED_KEY, true)));
+                            }
+                        } catch (ConversionException e) {
+                            LOGGER.warn("An error occurred while reading a browser preference:", e);
+                        }
+                    }
+                } catch (Exception e) {
+                    LOGGER.warn("An error occurred while reading custom browser preferences:", e);
+                }
+
                 browsers.add(
                         new CustomBrowserImpl(
-                                name, driverPath, binaryPath, browserType, arguments));
+                                name, driverPath, binaryPath, browserType, arguments, preferences));
                 customNames.add(name);
             } catch (ConversionException e) {
                 LOGGER.warn("An error occurred while reading a custom browser:", e);

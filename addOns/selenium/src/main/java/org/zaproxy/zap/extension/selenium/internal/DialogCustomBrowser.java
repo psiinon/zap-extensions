@@ -54,6 +54,10 @@ public class DialogCustomBrowser extends AbstractFormDialog {
     private BrowserArgumentsTableModel argumentsTableModel;
     private JTextField argumentsTextField;
     private JButton argumentsButton;
+    private BrowserPreferencesDialog preferencesDialog;
+    private BrowserPreferencesTableModel preferencesTableModel;
+    private JTextField preferencesTextField;
+    private JButton preferencesButton;
 
     protected CustomBrowserImpl customBrowser;
     private List<CustomBrowserImpl> existingBrowsers;
@@ -64,6 +68,9 @@ public class DialogCustomBrowser extends AbstractFormDialog {
         argumentsTableModel = new BrowserArgumentsTableModel();
         argumentsDialog =
                 new BrowserArgumentsDialog(owner, argumentsTableModel, new AtomicBoolean());
+        preferencesTableModel = new BrowserPreferencesTableModel();
+        preferencesDialog =
+                new BrowserPreferencesDialog(owner, preferencesTableModel, new AtomicBoolean());
     }
 
     @Override
@@ -80,6 +87,7 @@ public class DialogCustomBrowser extends AbstractFormDialog {
         JLabel binaryPathLabel = createLabel("binary", getBinaryPathTextField());
         JLabel browserTypeLabel = createLabel("type", getBrowserTypeCombo());
         JLabel argumentsLabel = createLabel("args", getArgumentsTextField());
+        JLabel preferencesLabel = createLabel("prefs", getPreferencesTextField());
 
         layout.setHorizontalGroup(
                 layout.createSequentialGroup()
@@ -89,19 +97,22 @@ public class DialogCustomBrowser extends AbstractFormDialog {
                                         .addComponent(driverPathLabel)
                                         .addComponent(binaryPathLabel)
                                         .addComponent(browserTypeLabel)
-                                        .addComponent(argumentsLabel))
+                                        .addComponent(argumentsLabel)
+                                        .addComponent(preferencesLabel))
                         .addGroup(
                                 layout.createParallelGroup(GroupLayout.Alignment.LEADING)
                                         .addComponent(getNameTextField())
                                         .addComponent(getDriverPathTextField())
                                         .addComponent(getBinaryPathTextField())
                                         .addComponent(getBrowserTypeCombo())
-                                        .addComponent(getArgumentsTextField()))
+                                        .addComponent(getArgumentsTextField())
+                                        .addComponent(getPreferencesTextField()))
                         .addGroup(
                                 layout.createParallelGroup(GroupLayout.Alignment.LEADING)
                                         .addComponent(getDriverPathButton())
                                         .addComponent(getBinaryPathButton())
-                                        .addComponent(getArgumentsButton())));
+                                        .addComponent(getArgumentsButton())
+                                        .addComponent(getPreferencesButton())));
 
         layout.setVerticalGroup(
                 layout.createSequentialGroup()
@@ -127,7 +138,12 @@ public class DialogCustomBrowser extends AbstractFormDialog {
                                 layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
                                         .addComponent(argumentsLabel)
                                         .addComponent(getArgumentsTextField())
-                                        .addComponent(getArgumentsButton())));
+                                        .addComponent(getArgumentsButton()))
+                        .addGroup(
+                                layout.createParallelGroup(GroupLayout.Alignment.BASELINE)
+                                        .addComponent(preferencesLabel)
+                                        .addComponent(getPreferencesTextField())
+                                        .addComponent(getPreferencesButton())));
 
         setConfirmButtonEnabled(false);
 
@@ -156,7 +172,9 @@ public class DialogCustomBrowser extends AbstractFormDialog {
         reset(getBinaryPathTextField());
         getBrowserTypeCombo().setSelectedItem(CustomBrowserImpl.BrowserType.CHROMIUM);
         argumentsTableModel.setArguments(new ArrayList<>());
+        preferencesTableModel.setPreferences(new ArrayList<>());
         updateArgumentsDisplay();
+        updatePreferencesDisplay();
         originalName = null;
 
         // If we have a browser to populate (for modify), populate it now
@@ -177,7 +195,9 @@ public class DialogCustomBrowser extends AbstractFormDialog {
             getBrowserTypeCombo().setSelectedItem(browser.getBrowserType());
             getBrowserTypeCombo().setEnabled(!browser.isBuiltIn());
             argumentsTableModel.setArguments(browser.getArguments());
+            preferencesTableModel.setPreferences(browser.getPreferences());
             updateArgumentsDisplay();
+            updatePreferencesDisplay();
             setConfirmButtonEnabled(true);
         }
     }
@@ -226,7 +246,8 @@ public class DialogCustomBrowser extends AbstractFormDialog {
                         getDriverPathTextField().getText().trim(),
                         getBinaryPathTextField().getText().trim(),
                         (CustomBrowserImpl.BrowserType) getBrowserTypeCombo().getSelectedItem(),
-                        argumentsTableModel.getElements());
+                        argumentsTableModel.getElements(),
+                        preferencesTableModel.getElements());
         // Explicitly set builtIn flag - preserve for modify, false for add
         customBrowser.setBuiltIn(isBuiltIn);
     }
@@ -238,7 +259,9 @@ public class DialogCustomBrowser extends AbstractFormDialog {
         reset(getBinaryPathTextField());
         getBrowserTypeCombo().setSelectedItem(CustomBrowserImpl.BrowserType.CHROMIUM);
         argumentsTableModel.setArguments(new ArrayList<>());
+        preferencesTableModel.setPreferences(new ArrayList<>());
         updateArgumentsDisplay();
+        updatePreferencesDisplay();
     }
 
     private static void reset(JTextField textField) {
@@ -382,9 +405,36 @@ public class DialogCustomBrowser extends AbstractFormDialog {
         return argumentsButton;
     }
 
+    protected JTextField getPreferencesTextField() {
+        if (preferencesTextField == null) {
+            preferencesTextField = new JTextField(25);
+            preferencesTextField.setEditable(false);
+        }
+        return preferencesTextField;
+    }
+
+    protected JButton getPreferencesButton() {
+        if (preferencesButton == null) {
+            preferencesButton =
+                    new JButton(
+                            Constant.messages.getString("selenium.options.label.button.configure"));
+            preferencesButton.addActionListener(
+                    e -> {
+                        preferencesDialog.setVisible(true);
+                        updatePreferencesDisplay();
+                    });
+        }
+        return preferencesButton;
+    }
+
     private void updateArgumentsDisplay() {
         argumentsTextField.setText(argumentsTableModel.getArgumentsAsString());
         argumentsTextField.setCaretPosition(0);
+    }
+
+    private void updatePreferencesDisplay() {
+        preferencesTextField.setText(preferencesTableModel.getPreferencesAsString());
+        preferencesTextField.setCaretPosition(0);
     }
 
     public void clear() {
