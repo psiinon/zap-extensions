@@ -45,11 +45,12 @@ public class CustomBrowserImpl {
     private String driverPath;
     private String binaryPath;
     private List<BrowserArgument> arguments;
+    private List<BrowserPreference> preferences;
     private BrowserType browserType;
     private boolean builtIn;
 
     public CustomBrowserImpl() {
-        this("", "", "", BrowserType.CHROMIUM, List.of());
+        this("", "", "", BrowserType.CHROMIUM, List.of(), List.of());
     }
 
     public CustomBrowserImpl(
@@ -58,15 +59,32 @@ public class CustomBrowserImpl {
             String binaryPath,
             BrowserType browserType,
             List<BrowserArgument> arguments) {
+        this(name, driverPath, binaryPath, browserType, arguments, List.of());
+    }
+
+    public CustomBrowserImpl(
+            String name,
+            String driverPath,
+            String binaryPath,
+            BrowserType browserType,
+            List<BrowserArgument> arguments,
+            List<BrowserPreference> preferences) {
         this.name = Objects.requireNonNull(name);
         this.driverPath = driverPath;
         this.binaryPath = binaryPath;
         this.browserType = Objects.requireNonNull(browserType);
         this.arguments = new ArrayList<>(arguments);
+        this.preferences = preferences != null ? new ArrayList<>(preferences) : new ArrayList<>();
     }
 
     public CustomBrowserImpl(CustomBrowserImpl other) {
-        this(other.name, other.driverPath, other.binaryPath, other.browserType, other.arguments);
+        this(
+                other.name,
+                other.driverPath,
+                other.binaryPath,
+                other.browserType,
+                other.arguments,
+                other.preferences);
         this.builtIn = other.builtIn;
     }
 
@@ -76,7 +94,8 @@ public class CustomBrowserImpl {
                 browser.getDriverPath(),
                 browser.getBinaryPath(),
                 BrowserType.valueOf(browser.getBrowserType().toUpperCase()),
-                stringsToArgs(browser.getArguments()));
+                stringsToArgs(browser.getArguments()),
+                List.of());
     }
 
     private static List<BrowserArgument> stringsToArgs(List<String> strs) {
@@ -88,6 +107,10 @@ public class CustomBrowserImpl {
 
     public List<BrowserArgument> getArguments() {
         return Collections.unmodifiableList(arguments);
+    }
+
+    public List<BrowserPreference> getPreferences() {
+        return Collections.unmodifiableList(preferences);
     }
 
     public void setName(String name) {
@@ -104,6 +127,10 @@ public class CustomBrowserImpl {
 
     public void setArguments(List<BrowserArgument> arguments) {
         this.arguments = new ArrayList<>(arguments);
+    }
+
+    public void setPreferences(List<BrowserPreference> preferences) {
+        this.preferences = preferences != null ? new ArrayList<>(preferences) : new ArrayList<>();
     }
 
     public void setBrowserType(BrowserType browserType) {
@@ -140,7 +167,24 @@ public class CustomBrowserImpl {
                 && browser.getDriverPath().equals(this.getDriverPath())
                 && browser.getBinaryPath().equals(this.getBinaryPath())
                 && browser.getBrowserType().equals(this.getBrowserType())
-                && equals(browser.getArguments(), this.getArguments());
+                && equals(browser.getArguments(), this.getArguments())
+                && equalsPreferences(browser.getPreferences(), this.getPreferences());
+    }
+
+    private static boolean equalsPreferences(
+            List<BrowserPreference> p1, List<BrowserPreference> p2) {
+        if (p1 == null && p2 == null) {
+            return true;
+        }
+        if (p1 == null || p2 == null || p1.size() != p2.size()) {
+            return false;
+        }
+        for (int i = 0; i < p1.size(); i++) {
+            if (!p1.get(i).equals(p2.get(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static boolean equals(List<BrowserArgument> args1, List<BrowserArgument> args2) {

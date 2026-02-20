@@ -198,6 +198,7 @@ class SeleniumOptionsPanel extends AbstractParamPanel {
         chromeArgumentsTableModel.setArguments(
                 seleniumOptions.getBrowserArguments(Browser.CHROME.getId()));
         chromeBrowser.setArguments(chromeArgumentsTableModel.getElements());
+        chromeBrowser.setPreferences(seleniumOptions.getBrowserPreferences(Browser.CHROME.getId()));
         allBrowsers.add(chromeBrowser);
 
         // Edge
@@ -213,6 +214,7 @@ class SeleniumOptionsPanel extends AbstractParamPanel {
         edgeArgumentsTableModel.setArguments(
                 seleniumOptions.getBrowserArguments(Browser.EDGE.getId()));
         edgeBrowser.setArguments(edgeArgumentsTableModel.getElements());
+        edgeBrowser.setPreferences(seleniumOptions.getBrowserPreferences(Browser.EDGE.getId()));
         allBrowsers.add(edgeBrowser);
 
         // Firefox
@@ -228,6 +230,8 @@ class SeleniumOptionsPanel extends AbstractParamPanel {
         firefoxArgumentsTableModel.setArguments(
                 seleniumOptions.getBrowserArguments(Browser.FIREFOX.getId()));
         firefoxBrowser.setArguments(firefoxArgumentsTableModel.getElements());
+        firefoxBrowser.setPreferences(
+                seleniumOptions.getBrowserPreferences(Browser.FIREFOX.getId()));
         allBrowsers.add(firefoxBrowser);
 
         // Add custom browsers
@@ -285,16 +289,22 @@ class SeleniumOptionsPanel extends AbstractParamPanel {
                     seleniumOptions.setChromeBinaryPath(browser.getBinaryPath());
                     seleniumOptions.setBrowserArguments(
                             Browser.CHROME.getId(), browser.getArguments());
+                    seleniumOptions.setBrowserPreferences(
+                            Browser.CHROME.getId(), browser.getPreferences());
                 } else if (edgeName.equals(browser.getName())) {
                     seleniumOptions.setEdgeDriverPath(browser.getDriverPath());
                     seleniumOptions.setEdgeBinaryPath(browser.getBinaryPath());
                     seleniumOptions.setBrowserArguments(
                             Browser.EDGE.getId(), browser.getArguments());
+                    seleniumOptions.setBrowserPreferences(
+                            Browser.EDGE.getId(), browser.getPreferences());
                 } else if (firefoxName.equals(browser.getName())) {
                     seleniumOptions.setFirefoxDriverPath(browser.getDriverPath());
                     seleniumOptions.setFirefoxBinaryPath(browser.getBinaryPath());
                     seleniumOptions.setBrowserArguments(
                             Browser.FIREFOX.getId(), browser.getArguments());
+                    seleniumOptions.setBrowserPreferences(
+                            Browser.FIREFOX.getId(), browser.getPreferences());
                 }
             } else {
                 // Collect custom browsers

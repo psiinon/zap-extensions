@@ -45,6 +45,7 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.parosproxy.paros.Constant;
 import org.zaproxy.zap.extension.selenium.internal.BrowserArgument;
+import org.zaproxy.zap.extension.selenium.internal.BrowserPreference;
 import org.zaproxy.zap.extension.selenium.internal.CustomBrowserImpl;
 import org.zaproxy.zap.testutils.TestUtils;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
@@ -129,6 +130,13 @@ class SeleniumOptionsUnitTest extends TestUtils {
         return Stream.of(
                 arguments("chrome", "selenium.chromeArgs.arg"),
                 arguments("firefox", "selenium.firefoxArgs.arg"));
+    }
+
+    static Stream<Arguments> browserPreferenceNameKey() {
+        return Stream.of(
+                arguments("chrome", "selenium.chromePrefs.pref"),
+                arguments("edge", "selenium.edgePrefs.pref"),
+                arguments("firefox", "selenium.firefoxPrefs.pref"));
     }
 
     static Stream<String> invalidBrowserNames() {
@@ -419,6 +427,217 @@ class SeleniumOptionsUnitTest extends TestUtils {
         assertThrows(IllegalArgumentException.class, () -> options.getBrowserArguments(browser));
     }
 
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldLoadConfigWithConfirmRemoveBrowserPreference(boolean value) {
+        // Given
+        ZapXmlConfiguration config =
+                configWith(
+                        "<selenium>\n"
+                                + "  <confirmRemoveBrowserPref>"
+                                + value
+                                + "</confirmRemoveBrowserPref>\n"
+                                + "</selenium>");
+        // When
+        options.load(config);
+        // Then
+        assertThat(options.isConfirmRemoveBrowserPreference(), is(equalTo(value)));
+    }
+
+    @Test
+    void shouldLoadConfigWithInvalidConfirmRemoveBrowserPreference() {
+        // Given
+        ZapXmlConfiguration config =
+                configWith(
+                        "<selenium>\n"
+                                + "  <confirmRemoveBrowserPref>not boolean</confirmRemoveBrowserPref>\n"
+                                + "</selenium>");
+        // When
+        options.load(config);
+        // Then
+        assertThat(options.isConfirmRemoveBrowserPreference(), is(equalTo(true)));
+    }
+
+    @ParameterizedTest
+    @ValueSource(booleans = {true, false})
+    void shouldSetAndPersistConfirmRemoveBrowserPreference(boolean value) throws Exception {
+        // Given
+        ZapXmlConfiguration config = new ZapXmlConfiguration();
+        options.load(config);
+        // When
+        options.setConfirmRemoveBrowserPreference(value);
+        // Then
+        assertThat(options.isConfirmRemoveBrowserPreference(), is(equalTo(value)));
+        assertThat(config.getBoolean("selenium.confirmRemoveBrowserPref"), is(equalTo(value)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("browserPreferenceNameKey")
+    void shouldAddBrowserPreference(String browser, String key) {
+        // Given
+        ZapXmlConfiguration config = new ZapXmlConfiguration();
+        options.load(config);
+        BrowserPreference preference = new BrowserPreference("pref.name", "prefValue", true);
+        // When
+        options.addBrowserPreference(browser, preference);
+        // Then
+        assertThat(options.getBrowserPreferences(browser), hasSize(1));
+        assertThat(config.getProperty(key + "(0).name"), is(equalTo("pref.name")));
+        assertThat(config.getProperty(key + "(0).value"), is(equalTo("prefValue")));
+        assertThat(config.getProperty(key + "(0).enabled"), is(equalTo(true)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("browserPreferenceNameKey")
+    void shouldThrowIfAddingNullBrowserPreference(String browser, String key) {
+        // Given
+        BrowserPreference preference = null;
+        // When / Then
+        assertThrows(
+                NullPointerException.class,
+                () -> options.addBrowserPreference(browser, preference));
+        assertThat(options.getBrowserPreferences(browser), hasSize(0));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidBrowserNames")
+    void shouldThrowIfAddingBrowserPreferenceToInvalidBrowser(String browser) {
+        // Given
+        BrowserPreference preference = new BrowserPreference("name", "value", true);
+        // When / Then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> options.addBrowserPreference(browser, preference));
+    }
+
+    @ParameterizedTest
+    @MethodSource("browserPreferenceNameKey")
+    void shouldSetBrowserPreferenceEnabled(String browser, String key) {
+        // Given
+        ZapXmlConfiguration config = new ZapXmlConfiguration();
+        options.load(config);
+        options.addBrowserPreference(browser, new BrowserPreference("pref1", "v1", true));
+        options.addBrowserPreference(browser, new BrowserPreference("pref2", "v2", true));
+        // When
+        boolean changed = options.setBrowserPreferenceEnabled(browser, "  pref1 \t", false);
+        // Then
+        assertThat(changed, is(equalTo(true)));
+        assertThat(options.getBrowserPreferences(browser), hasSize(2));
+        assertThat(config.getProperty(key + "(0).name"), is(equalTo("pref1")));
+        assertThat(config.getProperty(key + "(0).enabled"), is(equalTo(false)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("browserPreferenceNameKey")
+    void shouldRemoveBrowserPreference(String browser, String key) {
+        // Given
+        ZapXmlConfiguration config = new ZapXmlConfiguration();
+        options.load(config);
+        options.addBrowserPreference(browser, new BrowserPreference("pref1", "v1", true));
+        options.addBrowserPreference(browser, new BrowserPreference("pref2", "v2", true));
+        // When
+        boolean removed = options.removeBrowserPreference(browser, "   pref1 \t");
+        // Then
+        assertThat(removed, is(equalTo(true)));
+        assertThat(options.getBrowserPreferences(browser), hasSize(1));
+        assertThat(options.getBrowserPreferences(browser).get(0).getName(), is(equalTo("pref2")));
+    }
+
+    @ParameterizedTest
+    @MethodSource("browserPreferenceNameKey")
+    void shouldLoadConfigWithBrowserPreferences(String browser, String key) {
+        // Given
+        String prefTag = browser + "Prefs";
+        ZapXmlConfiguration config =
+                configWith(
+                        "<selenium>\n"
+                                + "  <"
+                                + prefTag
+                                + ">\n"
+                                + "      <pref>\n"
+                                + "        <name>pref.name</name>\n"
+                                + "        <value>value1</value>\n"
+                                + "        <enabled>true</enabled>\n"
+                                + "      </pref>\n"
+                                + "      <pref>\n"
+                                + "        <name>other.pref</name>\n"
+                                + "        <value>value2</value>\n"
+                                + "        <enabled>false</enabled>\n"
+                                + "      </pref>\n"
+                                + "  </"
+                                + prefTag
+                                + ">\n"
+                                + "</selenium>");
+        // When
+        options.load(config);
+        // Then
+        assertThat(options.getBrowserPreferences(browser), hasSize(2));
+        assertThat(
+                options.getBrowserPreferences(browser).get(0).getName(), is(equalTo("pref.name")));
+        assertThat(options.getBrowserPreferences(browser).get(0).getValue(), is(equalTo("value1")));
+        assertThat(options.getBrowserPreferences(browser).get(0).isEnabled(), is(equalTo(true)));
+        assertThat(
+                options.getBrowserPreferences(browser).get(1).getName(), is(equalTo("other.pref")));
+        assertThat(options.getBrowserPreferences(browser).get(1).isEnabled(), is(equalTo(false)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("browserPreferenceNameKey")
+    void shouldSetAndPersistBrowserPreferences(String browser, String key) {
+        // Given
+        String prefTag = browser + "Prefs";
+        ZapXmlConfiguration config =
+                configWith(
+                        "<selenium>\n"
+                                + "  <"
+                                + prefTag
+                                + ">\n"
+                                + "      <pref>\n"
+                                + "        <name>pref.name</name>\n"
+                                + "        <value>val1</value>\n"
+                                + "        <enabled>true</enabled>\n"
+                                + "      </pref>\n"
+                                + "      <pref>\n"
+                                + "        <name>other.pref</name>\n"
+                                + "        <value>val2</value>\n"
+                                + "        <enabled>false</enabled>\n"
+                                + "      </pref>\n"
+                                + "  </"
+                                + prefTag
+                                + ">\n"
+                                + "</selenium>");
+        options.load(config);
+        List<BrowserPreference> preferences = options.getBrowserPreferences(browser);
+        options.load(new ZapXmlConfiguration());
+        // When
+        options.setBrowserPreferences(browser, preferences);
+        // Then
+        assertThat(options.getBrowserPreferences(browser), hasSize(2));
+        assertThat(
+                options.getBrowserPreferences(browser).get(0).getName(), is(equalTo("pref.name")));
+        assertThat(options.getBrowserPreferences(browser).get(0).isEnabled(), is(equalTo(true)));
+        assertThat(
+                options.getBrowserPreferences(browser).get(1).getName(), is(equalTo("other.pref")));
+        assertThat(options.getBrowserPreferences(browser).get(1).isEnabled(), is(equalTo(false)));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidBrowserNames")
+    void shouldThrowIfSettingBrowserPreferencesToInvalidBrowser(String browser) {
+        // Given
+        List<BrowserPreference> preferences = List.of();
+        // When / Then
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> options.setBrowserPreferences(browser, preferences));
+    }
+
+    @ParameterizedTest
+    @MethodSource("invalidBrowserNames")
+    void shouldThrowIfGettingBrowserPreferencesFromInvalidBrowser(String browser) {
+        assertThrows(IllegalArgumentException.class, () -> options.getBrowserPreferences(browser));
+    }
+
     @Test
     void shouldSetAndPersistFirefoxProfile() {
         // Given
@@ -561,6 +780,44 @@ class SeleniumOptionsUnitTest extends TestUtils {
         assertThat(
                 config.getProperty("selenium.customBrowsers.browser(0).args.arg(1).enabled"),
                 is(equalTo(false)));
+    }
+
+    @Test
+    void shouldAddCustomBrowserWithPreferences() {
+        // Given
+        ZapXmlConfiguration config = new ZapXmlConfiguration();
+        options.load(config);
+        List<BrowserPreference> preferences = new ArrayList<>();
+        preferences.add(new BrowserPreference("pref.name1", "value1", true));
+        preferences.add(new BrowserPreference("pref.name2", "value2", false));
+        CustomBrowserImpl browser =
+                new CustomBrowserImpl(
+                        "TestBrowser",
+                        "/path/to/driver",
+                        "/path/to/binary",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        new ArrayList<>(),
+                        preferences);
+        // When
+        options.addCustomBrowser(browser);
+        // Then
+        assertThat(options.getCustomBrowsers(), hasSize(1));
+        CustomBrowserImpl added = options.getCustomBrowsers().get(0);
+        assertThat(added.getPreferences(), hasSize(2));
+        assertThat(added.getPreferences().get(0).getName(), is(equalTo("pref.name1")));
+        assertThat(added.getPreferences().get(0).getValue(), is(equalTo("value1")));
+        assertThat(added.getPreferences().get(0).isEnabled(), is(equalTo(true)));
+        assertThat(added.getPreferences().get(1).getName(), is(equalTo("pref.name2")));
+        assertThat(added.getPreferences().get(1).isEnabled(), is(equalTo(false)));
+        assertThat(
+                config.getProperty("selenium.customBrowsers.browser(0).prefs.pref(0).name"),
+                is(equalTo("pref.name1")));
+        assertThat(
+                config.getProperty("selenium.customBrowsers.browser(0).prefs.pref(0).value"),
+                is(equalTo("value1")));
+        assertThat(
+                config.getProperty("selenium.customBrowsers.browser(0).prefs.pref(0).enabled"),
+                is(equalTo(true)));
     }
 
     @Test

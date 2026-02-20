@@ -86,6 +86,7 @@ import org.zaproxy.zap.extension.script.ScriptType;
 import org.zaproxy.zap.extension.script.ScriptWrapper;
 import org.zaproxy.zap.extension.selenium.DriverConfiguration.DriverType;
 import org.zaproxy.zap.extension.selenium.internal.BrowserArgument;
+import org.zaproxy.zap.extension.selenium.internal.BrowserPreference;
 import org.zaproxy.zap.extension.selenium.internal.BuiltInSingleWebDriverProvider;
 import org.zaproxy.zap.extension.selenium.internal.CustomBrowserImpl;
 import org.zaproxy.zap.extension.selenium.internal.CustomBrowserWebDriverProvider;
@@ -1153,6 +1154,7 @@ public class ExtensionSelenium extends ExtensionAdaptor {
                         conf.isHeadless(),
                         conf.getBinaryPath(),
                         conf.getArguments());
+                applyChromiumPreferences(chromiumOptions, conf.getPreferences());
                 conf.getConsumer().accept(chromiumOptions);
 
                 if (isEdge) {
@@ -1183,6 +1185,7 @@ public class ExtensionSelenium extends ExtensionAdaptor {
                         conf.isHeadless(),
                         conf.getBinaryPath(),
                         conf.getArguments());
+                applyFirefoxPreferences(firefoxOptions, conf.getPreferences());
                 addFirefoxArguments(firefoxOptions);
                 conf.getConsumer().accept(firefoxOptions);
 
@@ -1249,27 +1252,49 @@ public class ExtensionSelenium extends ExtensionAdaptor {
             int proxyPort,
             Consumer<MutableCapabilities> consumer,
             boolean enableExtensions) {
-        boolean headless =
-                browser == Browser.CHROME_HEADLESS
-                        || browser == Browser.EDGE_HEADLESS
-                        || browser == Browser.FIREFOX_HEADLESS;
+        boolean headless;
+        Browser baseBrowser;
+        switch (browser) {
+            case CHROME_HEADLESS:
+                baseBrowser = Browser.CHROME;
+                headless = true;
+                break;
+            case EDGE_HEADLESS:
+                baseBrowser = Browser.EDGE;
+                headless = true;
+                break;
+            case FIREFOX_HEADLESS:
+                baseBrowser = Browser.FIREFOX;
+                headless = true;
+                break;
+            default:
+                baseBrowser = browser;
+                headless = false;
+        }
         String binaryPath = System.getProperty(SeleniumOptions.CHROME_BINARY_SYSTEM_PROPERTY);
-        if (browser == Browser.EDGE || browser == Browser.EDGE_HEADLESS) {
+        if (baseBrowser == Browser.EDGE) {
             binaryPath = System.getProperty(SeleniumOptions.EDGE_BINARY_SYSTEM_PROPERTY);
-        } else if (browser == Browser.FIREFOX || browser == Browser.FIREFOX_HEADLESS) {
+        } else if (baseBrowser == Browser.FIREFOX) {
             binaryPath = System.getProperty(SeleniumOptions.FIREFOX_BINARY_SYSTEM_PROPERTY);
         }
 
         List<String> arguments = new ArrayList<>();
-        if (browser == Browser.CHROME
-                || browser == Browser.CHROME_HEADLESS
-                || browser == Browser.EDGE
-                || browser == Browser.EDGE_HEADLESS) {
-            getSeleniumOptions().getBrowserArguments(browser.getId()).stream()
+        if (baseBrowser == Browser.CHROME || baseBrowser == Browser.EDGE) {
+            getSeleniumOptions().getBrowserArguments(baseBrowser.getId()).stream()
                     .filter(BrowserArgument::isEnabled)
                     .map(BrowserArgument::getArgument)
                     .forEach(arguments::add);
         }
+
+        Map<String, String> preferences = new HashMap<>();
+        getSeleniumOptions().getBrowserPreferences(baseBrowser.getId()).stream()
+                .filter(BrowserPreference::isEnabled)
+                .forEach(
+                        p -> {
+                            if (p.getName() != null && !p.getName().isEmpty()) {
+                                preferences.put(p.getName().trim(), p.getValue());
+                            }
+                        });
 
         return DriverConfiguration.builder()
                 .requester(requester)
@@ -1280,6 +1305,7 @@ public class ExtensionSelenium extends ExtensionAdaptor {
                 .binaryPath(binaryPath)
                 .driverPath("")
                 .arguments(arguments)
+                .preferences(preferences)
                 .consumer(consumer)
                 .enableExtensions(enableExtensions)
                 .build();
@@ -1323,6 +1349,16 @@ public class ExtensionSelenium extends ExtensionAdaptor {
                                 + customBrowser.getName());
         }
 
+        Map<String, String> preferences = new HashMap<>();
+        customBrowser.getPreferences().stream()
+                .filter(BrowserPreference::isEnabled)
+                .forEach(
+                        p -> {
+                            if (p.getName() != null && !p.getName().isEmpty()) {
+                                preferences.put(p.getName().trim(), p.getValue());
+                            }
+                        });
+
         return DriverConfiguration.builder()
                 .requester(requester)
                 .type(type)
@@ -1332,6 +1368,7 @@ public class ExtensionSelenium extends ExtensionAdaptor {
                 .binaryPath(binaryPath)
                 .driverPath(driverPath != null ? driverPath : "")
                 .arguments(arguments)
+                .preferences(preferences)
                 .consumer(consumer)
                 .enableExtensions(enableExtensions)
                 .build();
@@ -1363,6 +1400,55 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         if (!arguments.isEmpty()) {
             options.addArguments(arguments);
         }
+    }
+
+    private static void applyChromiumPreferences(
+            ChromiumOptions<?> options, Map<String, String> preferences) {
+        if (preferences == null || preferences.isEmpty()) {
+            return;
+        }
+        Map<String, Object> prefs = new HashMap<>();
+        for (Map.Entry<String, String> entry : preferences.entrySet()) {
+            String name = entry.getKey();
+            if (name != null && !name.isEmpty()) {
+                prefs.put(name.trim(), coercePreferenceValue(entry.getValue()));
+            }
+        }
+        if (!prefs.isEmpty()) {
+            options.setExperimentalOption("prefs", prefs);
+        }
+    }
+
+    private static void applyFirefoxPreferences(
+            FirefoxOptions options, Map<String, String> preferences) {
+        if (preferences == null) {
+            return;
+        }
+        for (Map.Entry<String, String> entry : preferences.entrySet()) {
+            String name = entry.getKey();
+            if (name != null && !name.isEmpty()) {
+                options.addPreference(name.trim(), coercePreferenceValue(entry.getValue()));
+            }
+        }
+    }
+
+    private static Object coercePreferenceValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        String v = value.trim();
+        if ("true".equalsIgnoreCase(v)) {
+            return true;
+        }
+        if ("false".equalsIgnoreCase(v)) {
+            return false;
+        }
+        try {
+            return Integer.parseInt(v);
+        } catch (NumberFormatException e) {
+            // not an integer
+        }
+        return v;
     }
 
     private static void configureChromiumOptions(

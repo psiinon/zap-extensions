@@ -53,6 +53,8 @@ class CustomBrowserImplUnitTest extends TestUtils {
         assertThat(browser.getBrowserType(), is(equalTo(CustomBrowserImpl.BrowserType.CHROMIUM)));
         assertThat(browser.getArguments(), is(notNullValue()));
         assertThat(browser.getArguments().isEmpty(), is(equalTo(true)));
+        assertThat(browser.getPreferences(), is(notNullValue()));
+        assertThat(browser.getPreferences().isEmpty(), is(equalTo(true)));
         assertThat(browser.isBuiltIn(), is(equalTo(false)));
     }
 
@@ -75,6 +77,30 @@ class CustomBrowserImplUnitTest extends TestUtils {
         assertThat(browser.getBrowserType(), is(equalTo(browserType)));
         assertThat(browser.getArguments(), hasSize(1));
         assertThat(browser.getArguments().get(0).getArgument(), is(equalTo("--arg1")));
+    }
+
+    @Test
+    void shouldCreateWithGivenValuesIncludingPreferences() {
+        // Given
+        String name = "TestBrowser";
+        List<BrowserArgument> arguments = new ArrayList<>();
+        arguments.add(new BrowserArgument("--arg1", true));
+        List<BrowserPreference> preferences = new ArrayList<>();
+        preferences.add(new BrowserPreference("pref.name", "prefValue", true));
+        // When
+        CustomBrowserImpl browser =
+                new CustomBrowserImpl(
+                        name,
+                        "/driver",
+                        "/binary",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        arguments,
+                        preferences);
+        // Then
+        assertThat(browser.getArguments(), hasSize(1));
+        assertThat(browser.getPreferences(), hasSize(1));
+        assertThat(browser.getPreferences().get(0).getName(), is(equalTo("pref.name")));
+        assertThat(browser.getPreferences().get(0).getValue(), is(equalTo("prefValue")));
     }
 
     @Test
@@ -106,13 +132,16 @@ class CustomBrowserImplUnitTest extends TestUtils {
     @Test
     void shouldCreateCopyFromOtherBrowser() {
         // Given
+        List<BrowserPreference> prefs = new ArrayList<>();
+        prefs.add(new BrowserPreference("p", "v", true));
         CustomBrowserImpl original =
                 new CustomBrowserImpl(
                         "Test",
                         "/driver",
                         "/binary",
                         CustomBrowserImpl.BrowserType.CHROMIUM,
-                        new ArrayList<>());
+                        new ArrayList<>(),
+                        prefs);
         original.setBuiltIn(true);
         // When
         CustomBrowserImpl copy = new CustomBrowserImpl(original);
@@ -121,6 +150,8 @@ class CustomBrowserImplUnitTest extends TestUtils {
         assertThat(copy.getDriverPath(), is(equalTo(original.getDriverPath())));
         assertThat(copy.getBinaryPath(), is(equalTo(original.getBinaryPath())));
         assertThat(copy.getBrowserType(), is(equalTo(original.getBrowserType())));
+        assertThat(copy.getPreferences(), hasSize(1));
+        assertThat(copy.getPreferences().get(0).getName(), is(equalTo("p")));
         assertThat(copy.isBuiltIn(), is(equalTo(original.isBuiltIn())));
     }
 
@@ -208,6 +239,97 @@ class CustomBrowserImplUnitTest extends TestUtils {
         // Then
         assertThat(browser.getArguments(), hasSize(1));
         assertThat(args, hasSize(2));
+    }
+
+    @Test
+    void shouldReturnUnmodifiablePreferences() {
+        // Given
+        List<BrowserPreference> prefs = new ArrayList<>();
+        prefs.add(new BrowserPreference("p1", "v1", true));
+        CustomBrowserImpl browser =
+                new CustomBrowserImpl(
+                        "Test",
+                        "",
+                        "",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        new ArrayList<>(),
+                        prefs);
+        // When
+        List<BrowserPreference> returned = browser.getPreferences();
+        // Then
+        assertThrows(
+                UnsupportedOperationException.class,
+                () -> returned.add(new BrowserPreference("p2", "v2", false)));
+    }
+
+    @Test
+    void shouldSetPreferencesAsCopy() {
+        // Given
+        CustomBrowserImpl browser = new CustomBrowserImpl();
+        List<BrowserPreference> prefs = new ArrayList<>();
+        prefs.add(new BrowserPreference("p1", "v1", true));
+        // When
+        browser.setPreferences(prefs);
+        prefs.add(new BrowserPreference("p2", "v2", false));
+        // Then
+        assertThat(browser.getPreferences(), hasSize(1));
+        assertThat(prefs, hasSize(2));
+    }
+
+    @Test
+    void shouldTreatAllFieldsEqualWhenPreferencesDiffer() {
+        // Given
+        List<BrowserPreference> prefs1 = new ArrayList<>();
+        prefs1.add(new BrowserPreference("p", "v1", true));
+        List<BrowserPreference> prefs2 = new ArrayList<>();
+        prefs2.add(new BrowserPreference("p", "v2", true));
+        CustomBrowserImpl browser1 =
+                new CustomBrowserImpl(
+                        "Test",
+                        "",
+                        "",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        new ArrayList<>(),
+                        prefs1);
+        CustomBrowserImpl browser2 =
+                new CustomBrowserImpl(
+                        "Test",
+                        "",
+                        "",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        new ArrayList<>(),
+                        prefs2);
+        // When
+        boolean equal = browser1.allFieldsEqual(browser2);
+        // Then
+        assertThat(equal, is(equalTo(false)));
+    }
+
+    @Test
+    void shouldTreatAllFieldsEqualWhenPreferencesSame() {
+        // Given
+        List<BrowserPreference> prefs = new ArrayList<>();
+        prefs.add(new BrowserPreference("p", "v", true));
+        CustomBrowserImpl browser1 =
+                new CustomBrowserImpl(
+                        "Test",
+                        "",
+                        "",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        new ArrayList<>(),
+                        new ArrayList<>(prefs));
+        CustomBrowserImpl browser2 =
+                new CustomBrowserImpl(
+                        "Test",
+                        "",
+                        "",
+                        CustomBrowserImpl.BrowserType.CHROMIUM,
+                        new ArrayList<>(),
+                        new ArrayList<>(prefs));
+        // When
+        boolean equal = browser1.allFieldsEqual(browser2);
+        // Then
+        assertThat(equal, is(equalTo(true)));
     }
 
     @Test

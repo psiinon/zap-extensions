@@ -55,6 +55,15 @@
 	<p>
 	<strong>Note:</strong> Adding invalid arguments might cause the browser to fail to start. ZAP already adds some arguments (e.g. headless mode arguments).
 
+	<h4>Browser Preferences</h4>
+	Each browser (built-in or custom) can have name/value preferences configured via the <code>Preferences...</code> button in the modify dialog.
+	Preferences are applied when the browser is launched:
+	<ul>
+	<li><strong>Chrome / Edge:</strong> Preferences are passed as the <code>prefs</code> experimental option. Use dotted names (e.g. <code>profile.default_content_setting_values.notifications</code>). Values can be text, numbers, or <code>true</code>/<code>false</code>.
+	<li><strong>Firefox:</strong> Preferences are set via <code>about:config</code>-style names (e.g. <code>network.proxy.type</code>). Values are coerced to string, integer, or boolean as appropriate.
+	</ul>
+	Only <strong>enabled</strong> preferences are applied. Duplicate preference names are not allowed when adding or modifying an entry.
+
 	<h4>Browser Profiles</h4>
 	You can choose which Firefox profile to use by default for Firefox browsers.
 	The <code>&lt;temporary&gt;</code> profile is one which is created by Selenium each time the browser is launched.
