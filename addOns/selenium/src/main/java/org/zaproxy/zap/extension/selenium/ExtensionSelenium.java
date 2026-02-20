@@ -590,7 +590,7 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         }
     }
 
-    private SeleniumOptions getOptions() {
+    protected SeleniumOptions getOptions() {
         if (options == null) {
             options = new SeleniumOptions();
         }
@@ -920,6 +920,39 @@ public class ExtensionSelenium extends ExtensionAdaptor {
         } else {
             throw new IllegalArgumentException(
                     "Unknown ProvidedBrowser: " + provided.getClass().getCanonicalName());
+        }
+
+        boolean mergePreferences =
+                driverConf.getPreferences() != null && !driverConf.getPreferences().isEmpty();
+        boolean mergeArguments =
+                driverConf.getArguments() != null && !driverConf.getArguments().isEmpty();
+        if (mergePreferences || mergeArguments) {
+            Map<String, String> mergedPrefs =
+                    mergePreferences
+                            ? new HashMap<>(config.getPreferences())
+                            : config.getPreferences();
+            if (mergePreferences) {
+                mergedPrefs.putAll(driverConf.getPreferences());
+            }
+            List<String> mergedArgs =
+                    mergeArguments ? new ArrayList<>(config.getArguments()) : config.getArguments();
+            if (mergeArguments) {
+                mergedArgs.addAll(driverConf.getArguments());
+            }
+            config =
+                    DriverConfiguration.builder()
+                            .requester(config.getRequester())
+                            .proxyAddress(config.getProxyAddress())
+                            .proxyPort(config.getProxyPort())
+                            .consumer(config.getConsumer())
+                            .type(config.getType())
+                            .headless(config.isHeadless())
+                            .binaryPath(config.getBinaryPath())
+                            .driverPath(config.getDriverPath())
+                            .arguments(mergedArgs)
+                            .preferences(mergedPrefs)
+                            .enableExtensions(config.isEnableExtensions())
+                            .build();
         }
 
         try {
