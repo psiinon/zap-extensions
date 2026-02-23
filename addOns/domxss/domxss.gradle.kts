@@ -14,6 +14,18 @@ zapAddOn {
         classpath.setFrom(files())
         extensions {
             register("org.zaproxy.zap.extension.domxss.ExtensionDomXSS")
+            register("org.zaproxy.zap.extension.domxss.client.ExtensionDomXssClient") {
+                classnames {
+                    allowed.set(listOf("org.zaproxy.zap.extension.domxss.client"))
+                }
+                dependencies {
+                    addOns {
+                        register("client") {
+                            version.set(">=0.11.0")
+                        }
+                    }
+                }
+            }
         }
         dependencies {
             addOns {
@@ -32,6 +44,7 @@ zapAddOn {
 }
 
 dependencies {
+    zapAddOn("client")
     zapAddOn("commonlib")
     zapAddOn("network")
     zapAddOn("selenium")

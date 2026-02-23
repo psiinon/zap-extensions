@@ -37,6 +37,9 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Consumer;
 import javax.swing.ImageIcon;
 import javax.swing.SwingUtilities;
 import org.apache.commons.httpclient.URI;
@@ -49,7 +52,9 @@ import org.openqa.selenium.WebDriverException;
 import org.parosproxy.paros.Constant;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.control.Control.Mode;
+import org.parosproxy.paros.core.scanner.HostProcess;
 import org.parosproxy.paros.core.scanner.Plugin.AlertThreshold;
+import org.parosproxy.paros.core.scanner.PluginFactory;
 import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
@@ -59,7 +64,11 @@ import org.parosproxy.paros.extension.history.ExtensionHistory;
 import org.parosproxy.paros.model.Model;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.model.SiteNode;
+import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.view.View;
+import org.zaproxy.addon.client.ascan.ClientActiveScanWebDriverPool;
+import org.zaproxy.addon.client.ascan.ExampleClientActiveScanRule;
+import org.zaproxy.addon.client.ascan.ExampleClientActiveScanRule2;
 import org.zaproxy.addon.client.impl.ClientZestRecorder;
 import org.zaproxy.addon.client.internal.ClientMap;
 import org.zaproxy.addon.client.internal.ClientMapWriter;
@@ -164,9 +173,23 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
     private List<AuthenticationHandler> authHandlers =
             Collections.synchronizedList(new ArrayList<>());
 
+    private ExampleClientActiveScanRule exampleClientActiveScanRule;
+    private ExampleClientActiveScanRule2 exampleClientActiveScanRule2;
+
+    private final Map<HostProcess, PoolRefCount> clientAscanPools = new ConcurrentHashMap<>();
+
     public ExtensionClientIntegration() {
         super(NAME);
         this.setOrder(410);
+    }
+
+    @Override
+    public void init() {
+        super.init();
+        exampleClientActiveScanRule = new ExampleClientActiveScanRule();
+        exampleClientActiveScanRule.setStatus(getAddOn().getStatus());
+        exampleClientActiveScanRule2 = new ExampleClientActiveScanRule2();
+        exampleClientActiveScanRule2.setStatus(getAddOn().getStatus());
     }
 
     @Override
@@ -200,6 +223,13 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
     @Override
     public void hook(ExtensionHook extensionHook) {
         super.hook(extensionHook);
+
+        if (exampleClientActiveScanRule != null) {
+            PluginFactory.loadedPlugin(exampleClientActiveScanRule);
+        }
+        if (exampleClientActiveScanRule2 != null) {
+            PluginFactory.loadedPlugin(exampleClientActiveScanRule2);
+        }
 
         this.api = new ClientIntegrationAPI(this);
 
@@ -478,6 +508,13 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
                 .getExtension(ExtensionPassiveScan2.class)
                 .removePscanRuleProvider(clientPscanRuleProvider);
 
+        if (exampleClientActiveScanRule != null) {
+            PluginFactory.unloadedPlugin(exampleClientActiveScanRule);
+        }
+        if (exampleClientActiveScanRule2 != null) {
+            PluginFactory.unloadedPlugin(exampleClientActiveScanRule2);
+        }
+
         if (hasView()) {
             getClientSpiderPanel().unload();
             getView()
@@ -503,6 +540,54 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
 
     public ClientNode getClientNode(String url, boolean visited, boolean storage) {
         return this.clientTree.getNode(url, visited, storage);
+    }
+
+    /**
+     * Returns the client map containing all client-side discovered URLs and components.
+     *
+     * @return the client map, or {@code null} if not initialised
+     */
+    public ClientMap getClientMap() {
+        return clientTree;
+    }
+
+    /**
+     * Returns the shared WebDriver pool for the given scan (HostProcess). Creates the pool on first
+     * use and increments a reference count. Client active scan rules must call {@link
+     * #releaseClientActiveScanPool(HostProcess)} when they finish (e.g. in setTimeFinished).
+     *
+     * @param hostProcess the scan (host process)
+     * @param context scan context for proxy URL exclusions, may be null
+     * @param messageSender used to send proxy traffic through ZAP (e.g. rule's sendAndReceive)
+     * @return the shared pool for this scan
+     */
+    public ClientActiveScanWebDriverPool getClientActiveScanPool(
+            HostProcess hostProcess, Context context, Consumer<HttpMessage> messageSender) {
+        return clientAscanPools
+                .computeIfAbsent(
+                        hostProcess,
+                        hp ->
+                                new PoolRefCount(
+                                        new ClientActiveScanWebDriverPool(
+                                                this, context, messageSender)))
+                .acquire();
+    }
+
+    /**
+     * Releases the reference to the shared pool for the given scan. When the reference count
+     * reaches zero, the pool is tidied (drivers quit, proxy stopped) and removed.
+     *
+     * @param hostProcess the scan (host process)
+     */
+    public void releaseClientActiveScanPool(HostProcess hostProcess) {
+        PoolRefCount refCount = clientAscanPools.get(hostProcess);
+        if (refCount == null) {
+            return;
+        }
+        if (refCount.release()) {
+            clientAscanPools.remove(hostProcess);
+            refCount.pool.tidyUp();
+        }
     }
 
     public void clientNodeSelected(ClientNode node) {
@@ -1018,6 +1103,25 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
         @Override
         public boolean hasRule(int id) {
             return passiveScanController.hasRule(id);
+        }
+    }
+
+    private static final class PoolRefCount {
+        final ClientActiveScanWebDriverPool pool;
+        int refCount = 0;
+
+        PoolRefCount(ClientActiveScanWebDriverPool pool) {
+            this.pool = pool;
+        }
+
+        synchronized ClientActiveScanWebDriverPool acquire() {
+            refCount++;
+            return pool;
+        }
+
+        synchronized boolean release() {
+            refCount--;
+            return refCount <= 0;
         }
     }
 }
