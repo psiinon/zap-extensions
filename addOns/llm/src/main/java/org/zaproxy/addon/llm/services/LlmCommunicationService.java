@@ -59,7 +59,7 @@ public class LlmCommunicationService {
     protected static final String AI_REVIEWED_TAG_KEY = "AI-Reviewed";
 
     private LlmAssistant llmAssistant;
-    private LlmResponseHandler listener;
+    private FocusableChatModelListener listener;
     @Getter private LlmProviderConfig pconf;
     @Getter private String modelName;
     private Requestor requestor;
@@ -71,9 +71,14 @@ public class LlmCommunicationService {
 
     public LlmCommunicationService(
             LlmProviderConfig pconf, String modelName, String outputTabName) {
+        this(pconf, modelName, new LlmResponseHandler(outputTabName));
+    }
+
+    public LlmCommunicationService(
+            LlmProviderConfig pconf, String modelName, FocusableChatModelListener chatListener) {
         this.pconf = pconf;
         this.modelName = modelName;
-        listener = new LlmResponseHandler(outputTabName);
+        listener = chatListener;
         chatMemory = MessageWindowChatMemory.withMaxMessages(10);
         model = buildModel();
 

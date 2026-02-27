@@ -36,19 +36,27 @@ public class LlmReviewAlertMenu extends PopupMenuItemAlert {
 
     private ExtensionLlm extLlm;
     private LlmActionReviewAlert actionReviewAlert;
+    private final boolean updateAlert;
 
-    public LlmReviewAlertMenu(ExtensionLlm extLlm, ExtensionAlert extAlert) {
-        super(Constant.messages.getString("alertFilters.llm.menu.review.title"), true);
+    public LlmReviewAlertMenu(ExtensionLlm extLlm, ExtensionAlert extAlert, boolean updateAlert) {
+        super(
+                Constant.messages.getString(
+                        updateAlert
+                                ? "alertFilters.llm.menu.review.title"
+                                : "alertFilters.llm.menu.review.title.report"),
+                true);
         this.extLlm = extLlm;
+        this.updateAlert = updateAlert;
         actionReviewAlert = new LlmActionReviewAlert(extLlm, extAlert);
     }
 
     @Override
     public void performAction(Alert alert) {
+        extLlm.switchToLlmChatPanel();
         new Thread(
                         () -> {
                             try {
-                                actionReviewAlert.reviewAlert(alert);
+                                actionReviewAlert.reviewAlert(alert, updateAlert);
                             } catch (Exception e) {
                                 Stats.incCounter("stats.llm.alertreview.result.error");
                                 View.getSingleton()
@@ -90,6 +98,6 @@ public class LlmReviewAlertMenu extends PopupMenuItemAlert {
 
     @Override
     public boolean isSafe() {
-        return true;
+        return !this.updateAlert;
     }
 }

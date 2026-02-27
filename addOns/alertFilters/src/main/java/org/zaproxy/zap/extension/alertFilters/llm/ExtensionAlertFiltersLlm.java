@@ -47,16 +47,16 @@ public class ExtensionAlertFiltersLlm extends ExtensionAdaptor {
     public void hook(ExtensionHook extensionHook) {
         super.hook(extensionHook);
         if (hasView()) {
+            var extLlm =
+                    Control.getSingleton().getExtensionLoader().getExtension(ExtensionLlm.class);
+            var extAlert =
+                    Control.getSingleton().getExtensionLoader().getExtension(ExtensionAlert.class);
             extensionHook
                     .getHookMenu()
-                    .addPopupMenuItem(
-                            new LlmReviewAlertMenu(
-                                    Control.getSingleton()
-                                            .getExtensionLoader()
-                                            .getExtension(ExtensionLlm.class),
-                                    Control.getSingleton()
-                                            .getExtensionLoader()
-                                            .getExtension(ExtensionAlert.class)));
+                    .addPopupMenuItem(new LlmReviewAlertMenu(extLlm, extAlert, false));
+            extensionHook
+                    .getHookMenu()
+                    .addPopupMenuItem(new LlmReviewAlertMenu(extLlm, extAlert, true));
         }
     }
 

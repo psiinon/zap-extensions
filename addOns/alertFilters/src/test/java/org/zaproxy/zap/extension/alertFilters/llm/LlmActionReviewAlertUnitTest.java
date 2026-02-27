@@ -20,22 +20,25 @@
 package org.zaproxy.zap.extension.alertFilters.llm;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.withSettings;
 
-import dev.langchain4j.data.message.AiMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
 import java.util.Locale;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.quality.Strictness;
@@ -45,7 +48,6 @@ import org.parosproxy.paros.core.scanner.Alert;
 import org.parosproxy.paros.extension.ExtensionLoader;
 import org.parosproxy.paros.model.Model;
 import org.zaproxy.addon.llm.ExtensionLlm;
-import org.zaproxy.addon.llm.services.LlmCommunicationService;
 import org.zaproxy.zap.extension.alert.ExtensionAlert;
 import org.zaproxy.zap.testutils.TestUtils;
 import org.zaproxy.zap.utils.I18N;
@@ -72,6 +74,12 @@ class LlmActionReviewAlertUnitTest extends TestUtils {
                         mock(ExtensionAlert.class, withSettings().strictness(Strictness.LENIENT)));
     }
 
+    @BeforeEach
+    void setUp() {
+        reset(extLlm);
+        given(extLlm.isConfigured()).willReturn(true);
+    }
+
     @Test
     void shouldNotBeConsideredReviewdIfNoTags() {
         // Given
@@ -96,13 +104,14 @@ class LlmActionReviewAlertUnitTest extends TestUtils {
     @Test
     void shouldIncludeAlertTitleAndDescriptionInPrompt() throws Exception {
         // Given
-        LlmCommunicationService comms = mock(LlmCommunicationService.class);
-        given(extLlm.getCommunicationService(anyString(), anyString())).willReturn(comms);
         ChatResponse resp = mock(ChatResponse.class);
-        given(comms.chat(any(ChatRequest.class))).willReturn(resp);
-        AiMessage aiMsg = mock(AiMessage.class);
-        given(resp.aiMessage()).willReturn(aiMsg);
-        given(aiMsg.text()).willReturn("{}");
+        given(extLlm.executeChatRequestForPanel(anyString(), any(ChatRequest.class), anyBoolean()))
+                .willReturn(resp);
+        given(
+                        extLlm.parseChatResponse(
+                                any(ChatResponse.class),
+                                eq(LlmActionReviewAlert.AlertFeedback.class)))
+                .willReturn(new LlmActionReviewAlert.AlertFeedback(0, "test"));
         ArgumentCaptor<ChatRequest> argument = ArgumentCaptor.forClass(ChatRequest.class);
 
         Alert alert = new Alert(-1);
@@ -113,21 +122,25 @@ class LlmActionReviewAlertUnitTest extends TestUtils {
         action.reviewAlert(alert);
 
         // Then
-        verify(comms).chat(argument.capture());
-        contains(argument.getValue().messages().get(0).toString(), "Test Name");
-        contains(argument.getValue().messages().get(0).toString(), "Test Description");
+        verify(extLlm)
+                .executeChatRequestForPanel(eq("ALERT_REVIEW"), argument.capture(), eq(false));
+        assertThat(argument.getValue().messages().get(0).toString(), containsString("Test Name"));
+        assertThat(
+                argument.getValue().messages().get(0).toString(),
+                containsString("Test Description"));
     }
 
     @Test
     void shouldIncludeAlertOtherInfoInPrompt() throws Exception {
         // Given
-        LlmCommunicationService comms = mock(LlmCommunicationService.class);
-        given(extLlm.getCommunicationService(anyString(), anyString())).willReturn(comms);
         ChatResponse resp = mock(ChatResponse.class);
-        given(comms.chat(any(ChatRequest.class))).willReturn(resp);
-        AiMessage aiMsg = mock(AiMessage.class);
-        given(resp.aiMessage()).willReturn(aiMsg);
-        given(aiMsg.text()).willReturn("{}");
+        given(extLlm.executeChatRequestForPanel(anyString(), any(ChatRequest.class), anyBoolean()))
+                .willReturn(resp);
+        given(
+                        extLlm.parseChatResponse(
+                                any(ChatResponse.class),
+                                eq(LlmActionReviewAlert.AlertFeedback.class)))
+                .willReturn(new LlmActionReviewAlert.AlertFeedback(0, "test"));
         ArgumentCaptor<ChatRequest> argument = ArgumentCaptor.forClass(ChatRequest.class);
 
         Alert alert = new Alert(-1);
@@ -137,7 +150,10 @@ class LlmActionReviewAlertUnitTest extends TestUtils {
         action.reviewAlert(alert);
 
         // Then
-        verify(comms).chat(argument.capture());
-        contains(argument.getValue().messages().get(0).toString(), "Test Other Info");
+        verify(extLlm)
+                .executeChatRequestForPanel(eq("ALERT_REVIEW"), argument.capture(), eq(false));
+        assertThat(
+                argument.getValue().messages().get(0).toString(),
+                containsString("Test Other Info"));
     }
 }

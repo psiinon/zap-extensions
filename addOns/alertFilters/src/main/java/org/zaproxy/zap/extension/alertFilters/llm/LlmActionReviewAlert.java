@@ -38,7 +38,6 @@ import org.parosproxy.paros.core.scanner.Alert;
 import org.parosproxy.paros.db.DatabaseException;
 import org.parosproxy.paros.network.HttpMalformedHeaderException;
 import org.zaproxy.addon.llm.ExtensionLlm;
-import org.zaproxy.addon.llm.services.LlmCommunicationService;
 import org.zaproxy.zap.extension.alert.ExtensionAlert;
 import org.zaproxy.zap.utils.Stats;
 
@@ -72,10 +71,20 @@ public class LlmActionReviewAlert {
 
             The alert is described as follows: {{description}}
 
+            {{evidence_section}}
+            """;
+
+    private static final String ALERT_REVIEW_EVIDENCE_WITH_CONTENT =
+            """
             As evidence, the HTTP message contains:
             ---
             {{evidence}}
             ---
+            """;
+
+    private static final String ALERT_REVIEW_EVIDENCE_EMPTY =
+            """
+            The evidence is empty. This is usually the case when security controls are missing (e.g. security headers, input validation).
             """;
 
     private static final String ALERT_REVIEW_OTHER_INFO =
@@ -99,8 +108,16 @@ public class LlmActionReviewAlert {
                     JsonProcessingException,
                     HttpMalformedHeaderException,
                     DatabaseException {
+        reviewAlert(alert, true);
+    }
 
-        if (isPreviouslyReviewed(alert)) {
+    public void reviewAlert(Alert alert, boolean updateAlert)
+            throws JsonMappingException,
+                    JsonProcessingException,
+                    HttpMalformedHeaderException,
+                    DatabaseException {
+
+        if (updateAlert && isPreviouslyReviewed(alert)) {
             LOGGER.debug("Skipping previously reviewed alert : {} ", alert.getName());
             return;
         }
@@ -124,12 +141,18 @@ public class LlmActionReviewAlert {
                                         .build())
                         .build();
 
+        String evidenceSection =
+                StringUtils.isBlank(alert.getEvidence())
+                        ? ALERT_REVIEW_EVIDENCE_EMPTY
+                        : ALERT_REVIEW_EVIDENCE_WITH_CONTENT.replace(
+                                "{{evidence}}", alert.getEvidence());
+
         UserMessage userMessage =
                 UserMessage.from(
                         ALERT_REVIEW_PROMPT
                                         .replace("{{title}}", alert.getName())
                                         .replace("{{description}}", alert.getDescription())
-                                        .replace("{{evidence}}", alert.getEvidence())
+                                        .replace("{{evidence_section}}", evidenceSection)
                                 + (StringUtils.isNotBlank(alert.getOtherInfo())
                                         ? ALERT_REVIEW_OTHER_INFO.replace(
                                                 "{{other}}", alert.getOtherInfo())
@@ -139,14 +162,31 @@ public class LlmActionReviewAlert {
         ChatRequest chatRequest =
                 ChatRequest.builder().responseFormat(responseFormat).messages(userMessage).build();
 
-        LlmCommunicationService commsService =
-                extLlm.getCommunicationService(
-                        "ALERT_REVIEW",
-                        Constant.messages.getString("alertFilters.llm.reviewalert.output.tab"));
+        ChatResponse resp = extLlm.executeChatRequestForPanel("ALERT_REVIEW", chatRequest, false);
+        if (resp == null) {
+            throw new IllegalStateException("Alert review service not available");
+        }
 
-        ChatResponse resp = commsService.chat(chatRequest);
-        commsService.switchToOutputTab();
-        AlertFeedback feedback = LlmCommunicationService.mapResponse(resp, AlertFeedback.class);
+        AlertFeedback feedback = extLlm.parseChatResponse(resp, AlertFeedback.class);
+
+        String noChangeKey =
+                updateAlert
+                        ? "alertFilters.llm.reviewalert.response.nochange"
+                        : "alertFilters.llm.reviewalert.response.report.nochange";
+        String changedKey =
+                updateAlert
+                        ? "alertFilters.llm.reviewalert.response.changed"
+                        : "alertFilters.llm.reviewalert.response.report.changed";
+
+        String actionMessage =
+                feedback.level() == alert.getConfidence()
+                        ? Constant.messages.getString(noChangeKey)
+                        : Constant.messages.getString(
+                                changedKey,
+                                getConfidenceLevelString(alert.getConfidence()),
+                                getConfidenceLevelString(feedback.level()));
+
+        extLlm.appendToChatPanel(feedback.explanation() + "\n\n" + actionMessage);
 
         if (feedback.level() == alert.getConfidence()) {
             Stats.incCounter("stats.llm.alertreview.result.same");
@@ -158,20 +198,22 @@ public class LlmActionReviewAlert {
                 "Confidence level from LLM : {} | Explanation : {}",
                 feedback.level(),
                 feedback.explanation());
-        alert.setConfidence(feedback.level());
-        alert.setOtherInfo(getUpdatedOtherInfo(alert, feedback.explanation()));
-        Map<String, String> alertTags = new HashMap<>(alert.getTags());
 
-        alertTags.putIfAbsent(AI_REVIEWED_TAG_KEY, "");
-        alert.setTags(alertTags);
+        if (updateAlert) {
+            alert.setConfidence(feedback.level());
+            alert.setOtherInfo(getUpdatedOtherInfo(alert, feedback.explanation()));
+            Map<String, String> alertTags = new HashMap<>(alert.getTags());
+            alertTags.putIfAbsent(AI_REVIEWED_TAG_KEY, "");
+            alert.setTags(alertTags);
 
-        extAlert.updateAlert(alert);
-        extAlert.updateAlertInTree(alert);
-        if (alert.getHistoryRef() != null) {
-            alert.getHistoryRef().updateAlert(alert);
-            if (alert.getHistoryRef().getSiteNode() != null) {
-                // Needed if the same alert was raised on another href for the same SiteNode
-                alert.getHistoryRef().getSiteNode().updateAlert(alert);
+            extAlert.updateAlert(alert);
+            extAlert.updateAlertInTree(alert);
+            if (alert.getHistoryRef() != null) {
+                alert.getHistoryRef().updateAlert(alert);
+                if (alert.getHistoryRef().getSiteNode() != null) {
+                    // Needed if the same alert was raised on another href for the same SiteNode
+                    alert.getHistoryRef().getSiteNode().updateAlert(alert);
+                }
             }
         }
     }
@@ -183,5 +225,15 @@ public class LlmActionReviewAlert {
     private static String getUpdatedOtherInfo(Alert alert, String explanation) {
         return Constant.messages.getString(
                 "alertFilters.llm.reviewalert.otherinfo", alert.getOtherInfo(), explanation);
+    }
+
+    private static String getConfidenceLevelString(int level) {
+        return switch (level) {
+            case 0 -> Constant.messages.getString("alertFilters.panel.newalert.fp");
+            case 1 -> Constant.messages.getString("alertFilters.panel.newalert.low");
+            case 2 -> Constant.messages.getString("alertFilters.panel.newalert.medium");
+            case 3 -> Constant.messages.getString("alertFilters.panel.newalert.high");
+            default -> String.valueOf(level);
+        };
     }
 }

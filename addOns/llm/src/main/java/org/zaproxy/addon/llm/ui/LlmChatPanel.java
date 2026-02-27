@@ -331,6 +331,36 @@ public class LlmChatPanel extends AbstractPanel {
         }
     }
 
+    /**
+     * Appends request/response output to the message area. Thread-safe, schedules on EDT.
+     *
+     * @param prefix the label (e.g. "--- Request ---")
+     * @param content the message content
+     */
+    public void appendOutput(String prefix, String content) {
+        SwingUtilities.invokeLater(() -> appendMessage(prefix + "\n" + content));
+    }
+
+    /** Switches focus to this panel. Thread-safe, schedules on EDT. */
+    public void switchToPanel() {
+        SwingUtilities.invokeLater(this::setTabFocus);
+    }
+
+    /**
+     * Sets the processing state. When true, disables the input area and send button. When false,
+     * re-enables them. Thread-safe, schedules on EDT.
+     *
+     * @param processing true to indicate an LLM request is in progress
+     */
+    public void setProcessing(boolean processing) {
+        SwingUtilities.invokeLater(
+                () -> {
+                    isProcessing = processing;
+                    inputArea.setEnabled(!processing);
+                    sendButton.setEnabled(!processing);
+                });
+    }
+
     @Override
     public void updateUI() {
         super.updateUI();

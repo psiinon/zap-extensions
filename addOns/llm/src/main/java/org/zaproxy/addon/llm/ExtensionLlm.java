@@ -19,6 +19,10 @@
  */
 package org.zaproxy.addon.llm;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+import dev.langchain4j.model.chat.request.ChatRequest;
+import dev.langchain4j.model.chat.response.ChatResponse;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +34,7 @@ import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
 import org.parosproxy.paros.extension.OptionsChangedListener;
 import org.parosproxy.paros.model.OptionsParam;
+import org.zaproxy.addon.llm.services.LlmChatPanelResponseHandler;
 import org.zaproxy.addon.llm.services.LlmCommunicationService;
 import org.zaproxy.addon.llm.ui.LlmAppendAlertMenu;
 import org.zaproxy.addon.llm.ui.LlmAppendHttpMessageMenu;
@@ -49,6 +54,7 @@ public class ExtensionLlm extends ExtensionAdaptor {
 
     private LlmOptions options;
     private LlmOptions prevOptions;
+    private LlmChatPanel llmChatPanel;
     private Map<String, LlmCommunicationService> commsServices =
             Collections.synchronizedMap(new HashMap<>());
 
@@ -89,7 +95,7 @@ public class ExtensionLlm extends ExtensionAdaptor {
                 });
 
         if (hasView()) {
-            LlmChatPanel llmChatPanel = new LlmChatPanel(this);
+            llmChatPanel = new LlmChatPanel(this);
             extensionHook.getHookView().addOptionPanel(new LlmOptionsPanel());
             extensionHook
                     .getHookView()
@@ -172,6 +178,101 @@ public class ExtensionLlm extends ExtensionAdaptor {
                                 options.getDefaultProviderConfig(),
                                 options.getDefaultModelName(),
                                 outputTabName));
+    }
+
+    /** Switches focus to the LLM Chat panel. */
+    public void switchToLlmChatPanel() {
+        if (llmChatPanel != null) {
+            llmChatPanel.switchToPanel();
+        }
+    }
+
+    /**
+     * Executes a chat request, displaying the request and response in the LLM Chat panel. Returns
+     * null if not configured or if the chat panel is not available.
+     *
+     * @param commsKey the key to identify the service (e.g. for caching)
+     * @param chatRequest the chat request to send
+     * @return the chat response, or null if the service is not available
+     */
+    public ChatResponse executeChatRequestForPanel(String commsKey, ChatRequest chatRequest) {
+        return executeChatRequestForPanel(commsKey, chatRequest, true);
+    }
+
+    /**
+     * Executes a chat request, optionally displaying the response in the LLM Chat panel. Returns
+     * null if not configured or if the chat panel is not available.
+     *
+     * @param commsKey the key to identify the service (e.g. for caching)
+     * @param chatRequest the chat request to send
+     * @param appendResponseToPanel whether to append the raw response to the panel
+     * @return the chat response, or null if the service is not available
+     */
+    public ChatResponse executeChatRequestForPanel(
+            String commsKey, ChatRequest chatRequest, boolean appendResponseToPanel) {
+        LlmCommunicationService service =
+                getCommunicationServiceForChatPanel(commsKey, appendResponseToPanel);
+        if (service == null) {
+            return null;
+        }
+        ChatResponse response = service.chat(chatRequest);
+        service.switchToOutputTab();
+        return response;
+    }
+
+    /** Appends a message to the LLM Chat panel. */
+    public void appendToChatPanel(String message) {
+        if (llmChatPanel != null) {
+            llmChatPanel.appendOutput(
+                    Constant.messages.getString("llm.chat.panel.prefix.assistant"), message);
+        }
+    }
+
+    /**
+     * Parses the JSON text from a chat response into the specified type.
+     *
+     * @param response the chat response
+     * @param clazz the type to parse into
+     * @return the parsed object
+     */
+    public <T> T parseChatResponse(ChatResponse response, Class<T> clazz)
+            throws JsonMappingException, JsonProcessingException {
+        return LlmCommunicationService.mapResponse(response, clazz);
+    }
+
+    /**
+     * Returns a communication service that displays request/response in the LLM Chat panel. Returns
+     * null if not configured or if the chat panel is not available.
+     *
+     * @param commsKey the key to identify the service (e.g. for caching)
+     * @return the communication service, or null
+     */
+    public LlmCommunicationService getCommunicationServiceForChatPanel(String commsKey) {
+        return getCommunicationServiceForChatPanel(commsKey, true);
+    }
+
+    /**
+     * Returns a communication service that displays request/response in the LLM Chat panel. Returns
+     * null if not configured or if the chat panel is not available.
+     *
+     * @param commsKey the key to identify the service (e.g. for caching)
+     * @param appendResponseToPanel whether to append the raw response to the panel
+     * @return the communication service, or null
+     */
+    public LlmCommunicationService getCommunicationServiceForChatPanel(
+            String commsKey, boolean appendResponseToPanel) {
+        if (!isConfigured() || llmChatPanel == null) {
+            return null;
+        }
+        String cacheKey = commsKey + (appendResponseToPanel ? "" : ".no_append");
+        return commsServices.computeIfAbsent(
+                cacheKey,
+                k ->
+                        new LlmCommunicationService(
+                                options.getDefaultProviderConfig(),
+                                options.getDefaultModelName(),
+                                new LlmChatPanelResponseHandler(
+                                        llmChatPanel, appendResponseToPanel)));
     }
 
     public void setDefaultProvider(String name, String modelName) {

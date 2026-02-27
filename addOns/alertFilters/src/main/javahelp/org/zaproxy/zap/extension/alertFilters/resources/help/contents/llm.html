@@ -11,13 +11,19 @@ Alert Filter LLM Support
 This add-on supports LLM integration. It will only be enabled if you have chosen to install the LLM add-on.
 
 <H2>Alert Review</H2>
-The add-on adds a right click menu item "Review using LLM/AI" that is enabled for a single alert or an alert tree.
-<p>
-The alert review will instruct the configured LLM to examine one or more alerts and determine the confidence level based on evidence from ZAP, complete with an explanation for the updated confidence level.
-<p>
-The review will potentially change the confidence level of the alert(s).
-A new <code>LLM Explanation</code> will be added to the "Other Info" explaining why the change was made.
-The tag <code>AI-Reviewed</code> will always be added to any alerts reviewed.
+The add-on adds two right click menu items under <b>AI Assisted</b> that are enabled for a single alert or an alert tree:
+
+<H3>Review and Update using LLM</H3>
+Instructs the configured LLM to examine the alert(s) and determine the confidence level (False Positive, Low, Medium, or High) based on evidence from ZAP.
+<ul>
+<li>The confidence level of the alert(s) will be updated.</li>
+<li>A new <code>LLM Explanation</code> will be added to the "Other Info" field.</li>
+<li>The tag <code>AI-Reviewed</code> will be added to the alert.</li>
+<li>Alerts that have already been reviewed (with the AI-Reviewed tag) are skipped.</li>
+</ul>
+
+<H3>Review and Report using LLM</H3>
+Performs the same LLM review but does not update the alert. Instead, it provides a recommendation in the LLM Chat tab as to what the user should do. This is useful when you want an opinion without modifying the alert. Previously reviewed alerts are not skipped.
 
 </BODY>
 </HTML>

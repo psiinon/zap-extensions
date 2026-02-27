@@ -20,7 +20,6 @@
 package org.zaproxy.addon.llm.services;
 
 import dev.langchain4j.model.chat.listener.ChatModelErrorContext;
-import dev.langchain4j.model.chat.listener.ChatModelListener;
 import dev.langchain4j.model.chat.listener.ChatModelRequestContext;
 import dev.langchain4j.model.chat.listener.ChatModelResponseContext;
 import org.apache.logging.log4j.LogManager;
@@ -30,7 +29,7 @@ import org.parosproxy.paros.view.OutputPanel;
 import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.commonlib.ui.TabbedOutputPanel;
 
-public class LlmResponseHandler implements ChatModelListener {
+public class LlmResponseHandler implements FocusableChatModelListener {
 
     private static final Logger LOGGER = LogManager.getLogger(LlmResponseHandler.class);
 
@@ -72,6 +71,7 @@ public class LlmResponseHandler implements ChatModelListener {
                 String.format("LLM Error : %s", errorContext.error().getMessage()));
     }
 
+    @Override
     public void setFocus() {
         if (outputPanel != null) {
             outputPanel.setTabFocus();
