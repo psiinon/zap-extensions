@@ -1,0 +1,46 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<TITLE>
+MCP Resources
+</TITLE>
+</HEAD>
+<BODY>
+<H1>MCP Resources</H1>
+
+The following resources are available for MCP clients to read:
+
+<H2>zap://alerts</H2>
+ZAP security alerts. Each alert may include a <code>historyRef</code> field (e.g. <code>zap://history/123</code>) linking to the full HTTP request and response that triggered the alert. Use the <code>zap://history/{id}</code> resource to retrieve it.
+
+<H2>zap://contexts</H2>
+All configured ZAP contexts with their include and exclude regexes.
+
+<H2>zap://history</H2>
+ZAP proxy history summary. Returns the number of history entries (count) rather than the full list, since the history table can grow very large. Use <code>zap://history/{id}</code> to get the full request and response for a specific entry.
+
+<H2>zap://history/{id}</H2>
+Full HTTP request and response for a given history entry. Replace <code>{id}</code> with the history ID (e.g. <code>zap://history/123</code>). Returns JSON with <code>requestHeader</code>, <code>requestBody</code>, <code>responseHeader</code>, and <code>responseBody</code> fields.
+
+<H2>zap://scan-policies</H2>
+All available active scan policies (use with <code>zap_start_active_scan</code> policy parameter).
+
+<H2>zap://scan-status</H2>
+Scan progress for all long-running automation jobs (e.g. spider scans).
+
+<H2>zap://sites</H2>
+ZAP sites tree (top-level nodes).
+
+<H2>zap://sites-tree</H2>
+ZAP sites tree in the full format defined at <a href="https://www.zaproxy.org/docs/desktop/addons/import-export/sitestreeformat/">Sites Tree File Format</a>. Returns JSON (instead of YAML) with the same structure: each node has <code>node</code>, <code>url</code>, <code>method</code>, <code>responseLength</code>, <code>statusCode</code>, <code>data</code> (for POST with params), and <code>children</code>.
+
+<H2>See Also</H2>
+
+<ul>
+<li><a href="mcp.html">MCP Server</a> - Overview of the add-on
+<li><a href="mcp-options.html">Options</a> - Configuration options
+<li><a href="mcp-tools.html">Tools</a> - Available MCP tools
+</ul>
+
+</BODY>
+</HTML>

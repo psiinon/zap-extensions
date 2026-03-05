@@ -1,0 +1,48 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<HTML>
+<HEAD>
+<TITLE>
+MCP Server Add-on
+</TITLE>
+</HEAD>
+<BODY>
+<H1>MCP Server Add-on</H1>
+
+This add-on implements an MCP (Model Context Protocol) server in ZAP, allowing AI assistants and other MCP clients to interact with ZAP through a standard HTTP-based protocol.
+
+<H2>Overview</H2>
+
+The MCP server exposes ZAP functionality through:
+<ul>
+<li><a href="mcp-tools.html">Tools</a> - Actions that can be invoked by MCP clients (e.g. start spider, create context)
+<li><a href="mcp-resources.html">Resources</a> - Data that can be read by MCP clients (e.g. alerts, sites tree)
+</ul>
+
+<H2>Configuration</H2>
+
+The MCP server is configured via the <a href="mcp-options.html">Options</a> panel, where you can set:
+<ul>
+<li>The port the server listens on (default: 8282)
+<li>Whether to require a security key for authentication
+<li>The security key (when authentication is enabled)
+<li>Whether to record MCP server requests in ZAP history (disabled by default)
+</ul>
+
+<H2>Authentication</H2>
+
+When the security key is enabled, clients must include the key in the <code>Authorization</code> header:
+<pre>
+Authorization: &lt;your-security-key&gt;
+</pre>
+
+<H2>Accessing the Server</H2>
+
+The MCP server runs on <code>localhost</code> by default. MCP clients connect to:
+<pre>
+http://localhost:8282
+</pre>
+
+(or whatever port you have configured)
+
+</BODY>
+</HTML>
