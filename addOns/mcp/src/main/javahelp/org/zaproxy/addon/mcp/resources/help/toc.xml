@@ -11,6 +11,10 @@
 				<tocitem text="Tools" target="addon.mcp.tools"/>
 				<tocitem text="Prompts" target="addon.mcp.prompts"/>
 				<tocitem text="Resources" target="addon.mcp.resources"/>
+				<tocitem text="Automation" target="addon.mcp.automation">
+					<tocitem text="mcp-config Job" target="addon.mcp.automation.config"/>
+					<tocitem text="mcp-import Job" target="addon.mcp.automation.import"/>
+				</tocitem>
 			</tocitem>
 		</tocitem>
 	</tocitem>

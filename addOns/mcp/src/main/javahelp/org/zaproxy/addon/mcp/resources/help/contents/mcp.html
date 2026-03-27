@@ -39,10 +39,20 @@ The MCP server exposes ZAP functionality through:
 
 The MCP server is configured via the <a href="mcp-options.html">Options</a> panel, where you can set:
 <ul>
+<li>Whether the MCP server is enabled (default: enabled)
 <li>The port the server listens on (default: 8282)
 <li>Whether to require a security key for authentication
 <li>The security key (when authentication is enabled)
+<li>Whether to reject plain HTTP connections (Secure Only, enabled by default)
 <li>Whether to record MCP server requests in ZAP history (disabled by default)
+</ul>
+
+<H2>Automation Framework</H2>
+
+The add-on supports the <a href="mcp-automation.html">Automation Framework</a> with the following jobs:
+<ul>
+<li><a href="mcp-automation-config.html">mcp-config</a> - Configure the MCP server within an automation plan
+<li><a href="mcp-automation-import.html">mcp-import</a> - Import an external MCP server into ZAP's history and sites tree
 </ul>
 
 <H2>Authentication</H2>

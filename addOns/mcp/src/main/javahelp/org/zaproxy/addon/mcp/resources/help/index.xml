@@ -10,4 +10,7 @@
 	<indexitem text="MCP - tools" target="addon.mcp.tools" />
 	<indexitem text="MCP - prompts" target="addon.mcp.prompts" />
 	<indexitem text="MCP - resources" target="addon.mcp.resources" />
+	<indexitem text="MCP - automation" target="addon.mcp.automation" />
+	<indexitem text="MCP - automation - mcp-config" target="addon.mcp.automation.config" />
+	<indexitem text="MCP - automation - mcp-import" target="addon.mcp.automation.import" />
 </index>

@@ -30,7 +30,11 @@ import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
 import org.parosproxy.paros.extension.history.ExtensionHistory;
 import org.parosproxy.paros.model.OptionsParam;
+import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.automation.ExtensionAutomation;
+import org.zaproxy.addon.mcp.automation.ImportMcpServerJob;
+import org.zaproxy.addon.mcp.automation.McpConfigJob;
+import org.zaproxy.addon.mcp.importer.ImportMcpServerDialog;
 import org.zaproxy.addon.mcp.prompts.ZapBaselineScanPrompt;
 import org.zaproxy.addon.mcp.prompts.ZapFullScanPrompt;
 import org.zaproxy.addon.mcp.resources.AlertInstancesResource;
@@ -61,6 +65,7 @@ import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.addon.network.server.Server;
 import org.zaproxy.addon.pscan.ExtensionPassiveScan2;
 import org.zaproxy.addon.reports.ExtensionReports;
+import org.zaproxy.zap.view.ZapMenuItem;
 
 /**
  * The MCP add-on extension. Implements an MCP server in ZAP.
@@ -85,6 +90,8 @@ public class ExtensionMcp extends ExtensionAdaptor {
     private static final Logger LOGGER = LogManager.getLogger(ExtensionMcp.class);
 
     private Server server;
+    private ImportMcpServerJob importMcpServerJob;
+    private McpConfigJob mcpConfigJob;
     private final McpParam param = new McpParam();
     private final McpToolRegistry toolRegistry = new McpToolRegistry();
     private final McpResourceRegistry resourceRegistry = new McpResourceRegistry();
@@ -106,9 +113,29 @@ public class ExtensionMcp extends ExtensionAdaptor {
 
         extensionHook.addOptionsParamSet(param);
         extensionHook.addOptionsChangedListener(this::optionsChanged);
+        System.out.println("SBSB mcp register VariantJsonRpc (ensabled)"); // TODO
+        extensionHook.addVariant(org.zaproxy.addon.mcp.importer.VariantJsonRpc.class);
+
+        ExtensionAutomation extAutomation =
+                Control.getSingleton().getExtensionLoader().getExtension(ExtensionAutomation.class);
+        if (extAutomation != null) {
+            importMcpServerJob = new ImportMcpServerJob();
+            extAutomation.registerAutomationJob(importMcpServerJob);
+            mcpConfigJob = new McpConfigJob();
+            extAutomation.registerAutomationJob(mcpConfigJob);
+        }
 
         if (hasView()) {
             extensionHook.getHookView().addOptionPanel(new McpOptionsPanel());
+
+            ZapMenuItem importMenuItem = new ZapMenuItem("mcp.importserver.menu");
+            importMenuItem.addActionListener(
+                    e -> {
+                        ImportMcpServerDialog dialog =
+                                new ImportMcpServerDialog(View.getSingleton().getMainFrame());
+                        dialog.setVisible(true);
+                    });
+            extensionHook.getHookMenu().addImportMenuItem(importMenuItem);
         }
 
         toolRegistry.registerTool(new ZapVersionTool());
@@ -180,8 +207,18 @@ public class ExtensionMcp extends ExtensionAdaptor {
         startServer();
     }
 
+    public McpParam getMcpParam() {
+        return param;
+    }
+
+    /** Stops and restarts the MCP server using the current param values. */
+    public void applyServerConfig() {
+        stopServer();
+        startServer();
+    }
+
     private void startServer() {
-        if (server != null) {
+        if (server != null || !param.isEnabled()) {
             return;
         }
 
@@ -224,6 +261,16 @@ public class ExtensionMcp extends ExtensionAdaptor {
     @Override
     public void unload() {
         stopServer();
+        ExtensionAutomation extAutomation =
+                Control.getSingleton().getExtensionLoader().getExtension(ExtensionAutomation.class);
+        if (extAutomation != null) {
+            if (importMcpServerJob != null) {
+                extAutomation.unregisterAutomationJob(importMcpServerJob);
+            }
+            if (mcpConfigJob != null) {
+                extAutomation.unregisterAutomationJob(mcpConfigJob);
+            }
+        }
         super.unload();
     }
 

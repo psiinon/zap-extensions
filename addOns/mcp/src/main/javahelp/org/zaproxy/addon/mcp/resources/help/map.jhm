@@ -9,4 +9,7 @@
     <mapID target="addon.mcp.tools" url="contents/mcp-tools.html" />
     <mapID target="addon.mcp.prompts" url="contents/mcp-prompts.html" />
     <mapID target="addon.mcp.resources" url="contents/mcp-resources.html" />
+    <mapID target="addon.mcp.automation" url="contents/mcp-automation.html" />
+    <mapID target="addon.mcp.automation.config" url="contents/mcp-automation-config.html" />
+    <mapID target="addon.mcp.automation.import" url="contents/mcp-automation-import.html" />
 </map>
