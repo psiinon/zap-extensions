@@ -121,8 +121,8 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     private AutomationParam param;
     private LinkedHashMap<Integer, AutomationPlan> plans = new LinkedHashMap<>();
     private List<AutomationPlan> runningPlans = Collections.synchronizedList(new ArrayList<>());
-    private final Map<String, LongRunningJob> longRunningJobs = new ConcurrentHashMap<>();
-    private final Map<LongRunningJob, CompletableFuture<String>> pendingScanIds =
+    private final Map<String, AutomationJob> longRunningJobs = new ConcurrentHashMap<>();
+    private final Map<AutomationJob, CompletableFuture<String>> pendingScanIds =
             new ConcurrentHashMap<>();
 
     private CommandLineArgument[] arguments = new CommandLineArgument[5];
@@ -408,21 +408,22 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
         return Collections.unmodifiableList(runningPlans);
     }
 
-    protected void registerLongRunningJob(LongRunningJob job) {
-        CompletableFuture<String> future =
-                pendingScanIds.computeIfAbsent(job, k -> new CompletableFuture<>());
+    protected void registerLongRunningJob(AutomationJob job) {
+        if (!job.isLongRunningJob()) {
+            throw new IllegalStateException("Job is not long running " + job.getName());
+        }
+        CompletableFuture<String> future = getScanIdFuture(job);
         new Thread(
                         () -> {
                             long limit = TimeUnit.SECONDS.toMillis(10);
                             for (long i = 0; i < limit; i += 200) {
-                                String id = job.getScanId();
+                                String id = job.getLongRunningJobId();
                                 if (id != null) {
                                     longRunningJobs.put(id, job);
                                     future.complete(id);
                                     return;
                                 }
-                                if (job instanceof AutomationJob aj
-                                        && aj.getStatus() == AutomationJob.Status.COMPLETED) {
+                                if (job.getStatus() == AutomationJob.Status.COMPLETED) {
                                     future.completeExceptionally(
                                             new IllegalStateException(
                                                     "job completed without starting a scan"));
@@ -439,28 +440,24 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                             future.completeExceptionally(
                                     new TimeoutException("Scan ID not available after timeout"));
                         },
-                        "ZAP-AutoJobInit")
+                        "ZAP-AutoLongRunningJobInit")
                 .start();
     }
 
     /**
      * Returns a future that completes with the scan ID once the given job has started.
      *
-     * <p>If {@link #registerLongRunningJob} has not yet been called for the job, calling this
-     * method first creates the shared future so both sides always see the same instance.
-     *
      * @param job the long-running job
      * @return a future that resolves to the scan ID, or completes exceptionally on failure
      * @since 0.59.0
      */
-    public CompletableFuture<String> getScanIdFuture(LongRunningJob job) {
+    public CompletableFuture<String> getScanIdFuture(AutomationJob job) {
         return pendingScanIds.computeIfAbsent(job, k -> new CompletableFuture<>());
     }
 
     /**
      * Returns all known IDs of long-running jobs that have been started. Jobs remain tracked after
-     * completion so their status can be queried. The map is cleared when a new ZAP session is
-     * started.
+     * completion so their status can be queried.
      *
      * @return a list of job IDs
      * @since 0.59.0
@@ -470,15 +467,15 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
     }
 
     /**
-     * Returns the progress for the specified job ID.
+     * Returns the progress for the specified long running job ID.
      *
      * @param id the job id
      * @return the progress percentage (0-100), or -1 if the job is not found
      * @since 0.59.0
      */
-    public int getScanProgress(String id) {
-        LongRunningJob job = longRunningJobs.get(id);
-        return job != null ? job.getScanProgress() : -1;
+    public int getLongRunningJobProgress(String id) {
+        AutomationJob job = longRunningJobs.get(id);
+        return job != null ? job.getLongRunningJobProgress() : -1;
     }
 
     /**
@@ -487,10 +484,10 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
      * @return a map of job ID to progress percentage (0-100)
      * @since 0.59.0
      */
-    public Map<String, Integer> getAllScanProgress() {
+    public Map<String, Integer> getAllLongRunningJobProgresses() {
         Map<String, Integer> result = new HashMap<>();
-        for (Entry<String, LongRunningJob> entry : longRunningJobs.entrySet()) {
-            result.put(entry.getKey(), entry.getValue().getScanProgress());
+        for (Entry<String, AutomationJob> entry : longRunningJobs.entrySet()) {
+            result.put(entry.getKey(), entry.getValue().getLongRunningJobProgress());
         }
         return result;
     }
@@ -503,7 +500,7 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
      * @since 0.59.0
      */
     public boolean stopLongRunningJob(String id) {
-        LongRunningJob job = longRunningJobs.get(id);
+        AutomationJob job = longRunningJobs.get(id);
         if (job == null) {
             return false;
         }
@@ -613,8 +610,8 @@ public class ExtensionAutomation extends ExtensionAdaptor implements CommandLine
                 timer.start();
             }
             try {
-                if (job instanceof LongRunningJob lrJob) {
-                    registerLongRunningJob(lrJob);
+                if (job.isLongRunningJob()) {
+                    registerLongRunningJob(job);
                 }
                 job.runJob(env, progress);
             } catch (Exception e) {

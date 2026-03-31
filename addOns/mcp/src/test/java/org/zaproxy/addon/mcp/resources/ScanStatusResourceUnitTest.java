@@ -69,7 +69,7 @@ class ScanStatusResourceUnitTest {
 
     @Test
     void shouldReturnEmptyArrayWhenNoScans() {
-        given(extAutomation.getAllScanProgress()).willReturn(Map.of());
+        given(extAutomation.getAllLongRunningJobProgresses()).willReturn(Map.of());
 
         String content = resource.readContent();
 
@@ -78,7 +78,7 @@ class ScanStatusResourceUnitTest {
 
     @Test
     void shouldReturnScanWithIdAndProgress() {
-        given(extAutomation.getAllScanProgress()).willReturn(Map.of("spider-1", 75));
+        given(extAutomation.getAllLongRunningJobProgresses()).willReturn(Map.of("spider-1", 75));
 
         String content = resource.readContent();
         JsonNode array = parseJsonArray(content);
@@ -91,7 +91,7 @@ class ScanStatusResourceUnitTest {
 
     @Test
     void shouldReturnMultipleScans() {
-        given(extAutomation.getAllScanProgress())
+        given(extAutomation.getAllLongRunningJobProgresses())
                 .willReturn(Map.of("spider-1", 100, "ascan-2", 50));
 
         String content = resource.readContent();
@@ -102,7 +102,7 @@ class ScanStatusResourceUnitTest {
 
     @Test
     void shouldReturnScanWithFullProgress() {
-        given(extAutomation.getAllScanProgress()).willReturn(Map.of("ascan-1", 100));
+        given(extAutomation.getAllLongRunningJobProgresses()).willReturn(Map.of("ascan-1", 100));
 
         String content = resource.readContent();
         JsonNode array = parseJsonArray(content);

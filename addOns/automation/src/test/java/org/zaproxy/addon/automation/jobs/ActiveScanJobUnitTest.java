@@ -149,8 +149,8 @@ class ActiveScanJobUnitTest {
         assertThat(job.getOrder(), is(equalTo(Order.ATTACK)));
         assertThat(job.getParamMethodObject(), is(extAScan));
         assertThat(job.getParamMethodName(), is("getScannerParam"));
-        assertThat(job.getScanId(), is(equalTo(null)));
-        assertThat(job.getScanProgress(), is(equalTo(0)));
+        assertThat(job.getLongRunningJobId(), is(equalTo(null)));
+        assertThat(job.getLongRunningJobProgress(), is(equalTo(0)));
     }
 
     @Test

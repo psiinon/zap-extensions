@@ -41,7 +41,6 @@ import org.zaproxy.addon.automation.AutomationJob;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ContextWrapper;
 import org.zaproxy.addon.automation.JobResultData;
-import org.zaproxy.addon.automation.LongRunningJob;
 import org.zaproxy.addon.automation.gui.ActiveScanJobDialog;
 import org.zaproxy.addon.commonlib.Constants;
 import org.zaproxy.zap.extension.ascan.ActiveScan;
@@ -50,7 +49,7 @@ import org.zaproxy.zap.extension.ascan.ScanPolicy;
 import org.zaproxy.zap.model.Target;
 import org.zaproxy.zap.users.User;
 
-public class ActiveScanJob extends AutomationJob implements LongRunningJob {
+public class ActiveScanJob extends AutomationJob {
 
     public static final String JOB_NAME = "activeScan";
     private static final String OPTIONS_METHOD_NAME = "getScannerParam";
@@ -298,12 +297,17 @@ public class ActiveScanJob extends AutomationJob implements LongRunningJob {
     }
 
     @Override
-    public String getScanId() {
+    public boolean isLongRunningJob() {
+        return true;
+    }
+
+    @Override
+    public String getLongRunningJobId() {
         return scanId != null ? "ascan-" + scanId : null;
     }
 
     @Override
-    public int getScanProgress() {
+    public int getLongRunningJobProgress() {
         ActiveScan scan = currentScan;
         if (scan != null) {
             return scan.getProgress();

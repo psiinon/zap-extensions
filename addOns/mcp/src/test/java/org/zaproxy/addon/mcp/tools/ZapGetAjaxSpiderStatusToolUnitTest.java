@@ -97,7 +97,7 @@ class ZapGetAjaxSpiderStatusToolUnitTest {
 
     @Test
     void shouldThrowExceptionWhenScanNotFound() {
-        given(extAutomation.getScanProgress("ajaxspider-1")).willReturn(-1);
+        given(extAutomation.getLongRunningJobProgress("ajaxspider-1")).willReturn(-1);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ajaxspider-1"), Map.of());
 
         McpToolException ex =
@@ -112,7 +112,7 @@ class ZapGetAjaxSpiderStatusToolUnitTest {
 
     @Test
     void shouldReturnRunningStatusWhenProgressLessThan100() throws McpToolException {
-        given(extAutomation.getScanProgress("ajaxspider-1")).willReturn(50);
+        given(extAutomation.getLongRunningJobProgress("ajaxspider-1")).willReturn(50);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ajaxspider-1"), Map.of());
 
         McpToolResult result = tool.execute(args);
@@ -123,7 +123,7 @@ class ZapGetAjaxSpiderStatusToolUnitTest {
 
     @Test
     void shouldReturnStoppedStatusWhenProgressIs100() throws McpToolException {
-        given(extAutomation.getScanProgress("ajaxspider-1")).willReturn(100);
+        given(extAutomation.getLongRunningJobProgress("ajaxspider-1")).willReturn(100);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ajaxspider-1"), Map.of());
 
         McpToolResult result = tool.execute(args);
@@ -134,7 +134,7 @@ class ZapGetAjaxSpiderStatusToolUnitTest {
 
     @Test
     void shouldIncludeProgressInResult() throws McpToolException {
-        given(extAutomation.getScanProgress("ajaxspider-1")).willReturn(75);
+        given(extAutomation.getLongRunningJobProgress("ajaxspider-1")).willReturn(75);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ajaxspider-1"), Map.of());
 
         McpToolResult result = tool.execute(args);

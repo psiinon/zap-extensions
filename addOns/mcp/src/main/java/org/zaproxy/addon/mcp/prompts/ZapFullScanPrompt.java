@@ -56,25 +56,21 @@ public class ZapFullScanPrompt implements McpPrompt {
         String policy = arguments.getOrDefault("policy", "");
         String policyText =
                 policy.isBlank() ? "the default scan policy" : "the '" + policy + "' scan policy";
+        String activeScanArgs =
+                policy.isBlank()
+                        ? "target=" + target
+                        : "target=" + target + " and policy=" + policy;
         String message =
-                "Run a ZAP full scan against "
-                        + target
-                        + " using "
-                        + policyText
-                        + ". Use these steps:\n"
-                        + "1. Call zap_start_spider with target="
-                        + target
-                        + " and wait for it to finish (poll zap_get_spider_status until progress is 100%).\n"
-                        + "2. Call zap_start_ajax_spider with target="
-                        + target
-                        + " and wait for it to finish (poll zap_get_ajax_spider_status until it is stopped).\n"
-                        + "3. Call zap_get_passive_scan_status and wait until the passive scan is idle (records to scan reaches 0).\n"
-                        + "4. Call zap_start_active_scan with target="
-                        + target
-                        + (policy.isBlank() ? "" : " and policy=" + policy)
-                        + " and wait for it to finish (poll zap_get_active_scan_status until progress is 100%).\n"
-                        + "5. Call zap_generate_report with a suitable file_path and template to save a report.\n"
-                        + "6. Summarise the findings.";
+                """
+                Run a ZAP full scan against %s using %s. Use these steps:
+                1. Call zap_start_spider with target=%s and wait for it to finish (poll zap_get_spider_status until progress is 100%%).
+                2. Call zap_start_ajax_spider with target=%s and wait for it to finish (poll zap_get_ajax_spider_status until it is stopped).
+                3. Call zap_get_passive_scan_status and wait until the passive scan is idle (records to scan reaches 0).
+                4. Call zap_start_active_scan with %s and wait for it to finish (poll zap_get_active_scan_status until progress is 100%%).
+                5. Call zap_generate_report with a suitable file_path and template to save a report.
+                6. Summarise the findings.\
+                """
+                        .formatted(target, policyText, target, target, activeScanArgs);
         return List.of(new PromptMessage("user", message));
     }
 }

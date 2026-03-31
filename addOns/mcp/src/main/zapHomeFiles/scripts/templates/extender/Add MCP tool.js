@@ -8,11 +8,14 @@
 // This script demonstrates how to register a custom MCP tool with the ZAP MCP
 // Server. The MCP add-on must be installed for this to work.
 
-var Control = Java.type("org.parosproxy.paros.control.Control");
-var ExtensionMcp = Java.type("org.zaproxy.addon.mcp.ExtensionMcp");
-var McpTool = Java.type("org.zaproxy.addon.mcp.McpTool");
-var McpToolResult = Java.type("org.zaproxy.addon.mcp.McpToolResult");
-var McpToolException = Java.type("org.zaproxy.addon.mcp.McpToolException");
+const ExtensionMcp = Java.type("org.zaproxy.addon.mcp.ExtensionMcp");
+const McpTool = Java.type("org.zaproxy.addon.mcp.McpTool");
+const McpToolResult = Java.type("org.zaproxy.addon.mcp.McpToolResult");
+const McpToolException = Java.type("org.zaproxy.addon.mcp.McpToolException");
+const InputSchema = Java.type("org.zaproxy.addon.mcp.McpTool$InputSchema");
+const PropertyDef = Java.type("org.zaproxy.addon.mcp.McpTool$InputSchema$PropertyDef");
+const HashMap = Java.type("java.util.HashMap");
+const ArrayList = Java.type("java.util.ArrayList");
 
 const NAME = "example-tool";
 
@@ -27,19 +30,18 @@ function newTool() {
     },
 
     getInputSchema: function() {
-      var schema = McpTool.OBJECT_MAPPER.createObjectNode();
-      schema.put("type", "object");
-      var properties = schema.putObject("properties");
-      properties.putObject("message").put("type", "string").put("description", "The message to echo");
-      schema.putArray("required").add("message");
-      return schema;
+      var properties = new HashMap();
+      properties.put("message", PropertyDef.ofString("The message to echo"));
+      var required = new ArrayList();
+      required.add("message");
+      return new InputSchema(properties, required);
     },
 
     execute: function(arguments) {
-      if (!arguments || !arguments.has("message")) {
+      var message = arguments.getString("message");
+      if (message === null || message.trim() === "") {
         throw new McpToolException("The message parameter is required");
       }
-      var message = arguments.get("message").asText();
       return McpToolResult.success("Echo: " + message);
     }
   };
@@ -53,7 +55,7 @@ function newTool() {
  *   getApi() - returns an API object for adding API calls
  */
 function install(helper) {
-  var extMcp = Control.getSingleton().getExtensionLoader().getExtension(ExtensionMcp);
+  var extMcp = control.getExtensionLoader().getExtension(ExtensionMcp);
   if (extMcp === null) {
     print("MCP add-on is not installed. Cannot register example tool.");
     return;
@@ -69,7 +71,7 @@ function install(helper) {
  *   getApi() - returns an API object for adding API calls
  */
 function uninstall(helper) {
-  var extMcp = Control.getSingleton().getExtensionLoader().getExtension(ExtensionMcp);
+  var extMcp = control.getExtensionLoader().getExtension(ExtensionMcp);
   if (extMcp !== null) {
     extMcp.getToolRegistry().unregisterTool(NAME);
   }

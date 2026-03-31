@@ -78,8 +78,7 @@ public class McpParam extends VersionedAbstractParam {
         recordInHistory = getBoolean(RECORD_IN_HISTORY_KEY, false);
         secureOnly = getBoolean(SECURE_ONLY_KEY, true);
         if (securityKey == null || securityKey.isBlank()) {
-            securityKey = generateRandomKey();
-            getConfig().setProperty(SECURITY_KEY_KEY, securityKey);
+            setSecurityKey(generateRandomKey());
         }
     }
 

@@ -64,7 +64,7 @@ public class ZapStopAjaxSpiderTool implements McpTool {
         ExtensionAutomation extAutomation =
                 Control.getSingleton().getExtensionLoader().getExtension(ExtensionAutomation.class);
 
-        if (extAutomation.getScanProgress(scanId) < 0) {
+        if (extAutomation.getLongRunningJobProgress(scanId) < 0) {
             throw new McpToolException(
                     Constant.messages.getString(
                             "mcp.tool.stopajaxspider.error.scanidnotfound", scanId));

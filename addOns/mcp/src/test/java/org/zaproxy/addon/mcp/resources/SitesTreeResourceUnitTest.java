@@ -20,13 +20,11 @@
 package org.zaproxy.addon.mcp.resources;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.withSettings;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Collections;
 import java.util.Locale;
@@ -65,21 +63,26 @@ class SitesTreeResourceUnitTest {
 
     @Test
     void shouldHaveCorrectUriAndName() {
+        // Given / When / Then
         assertThat(resource.getUri(), equalTo("zap://sites-tree"));
         assertThat(resource.getName(), equalTo("sites-tree"));
     }
 
     @Test
     void shouldReturnEmptyArrayWhenRootIsNull() {
+        // Given
         given(siteMap.getRoot()).willReturn(null);
 
+        // When
         String content = resource.readContent();
 
-        assertThat(parseJsonArray(content).size(), equalTo(0));
+        // Then
+        assertThat(content, equalTo("[]"));
     }
 
     @Test
     void shouldReturnSitesNodeWhenEmptyTree() throws Exception {
+        // Given
         SiteNode root = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
         given(siteMap.getRoot()).willReturn(root);
         given(root.getParent()).willReturn(null);
@@ -88,16 +91,13 @@ class SitesTreeResourceUnitTest {
         given(root.getChildCount()).willReturn(0);
         given(root.children()).willReturn(Collections.emptyEnumeration());
 
-        String content = resource.readContent();
-        JsonNode array = parseJsonArray(content);
-
-        assertThat(array.size(), equalTo(1));
-        assertThat(array.get(0).get("node").asText(), equalTo("Sites"));
-        assertThat(array.get(0).has("children"), equalTo(false));
+        // When / Then
+        assertThat(resource.readContent(), equalTo("[{\"node\":\"Sites\"}]"));
     }
 
     @Test
     void shouldReturnNodeWithUrlAndMethodWhenHasHistoryReference() throws Exception {
+        // Given
         SiteNode root = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
         SiteNode child = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
         HistoryReference href =
@@ -123,27 +123,10 @@ class SitesTreeResourceUnitTest {
         given(href.getResponseHeaderLength()).willReturn(20);
         given(href.getResponseBodyLength()).willReturn(100);
 
-        String content = resource.readContent();
-        JsonNode array = parseJsonArray(content);
-
-        assertThat(array.size(), equalTo(1));
-        JsonNode rootNode = array.get(0);
-        assertThat(rootNode.get("node").asText(), equalTo("Sites"));
-        assertThat(rootNode.has("children"), equalTo(true));
-
-        JsonNode childNode = rootNode.get("children").get(0);
-        assertThat(childNode.get("node").asText(), containsString("example.com"));
-        assertThat(childNode.get("url").asText(), containsString("example.com"));
-        assertThat(childNode.get("method").asText(), equalTo("GET"));
-        assertThat(childNode.get("statusCode").asInt(), equalTo(200));
-        assertThat(childNode.get("responseLength").asInt(), equalTo(122));
-    }
-
-    private static JsonNode parseJsonArray(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
+        // When / Then
+        assertThat(
+                resource.readContent(),
+                equalTo(
+                        "[{\"node\":\"Sites\",\"children\":[{\"node\":\"https://example.com\",\"url\":\"https://example.com/\",\"method\":\"GET\",\"responseLength\":122,\"statusCode\":200}]}]"));
     }
 }

@@ -40,7 +40,6 @@ import org.zaproxy.addon.automation.AutomationJob;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ContextWrapper;
 import org.zaproxy.addon.automation.JobResultData;
-import org.zaproxy.addon.automation.LongRunningJob;
 import org.zaproxy.addon.automation.jobs.JobData;
 import org.zaproxy.addon.automation.jobs.JobUtils;
 import org.zaproxy.addon.automation.tests.AbstractAutomationTest;
@@ -52,16 +51,14 @@ import org.zaproxy.zap.extension.spiderAjax.AjaxSpiderParamElem;
 import org.zaproxy.zap.extension.spiderAjax.AjaxSpiderTarget;
 import org.zaproxy.zap.extension.spiderAjax.ExtensionAjax;
 import org.zaproxy.zap.extension.spiderAjax.SpiderListener;
-import org.zaproxy.zap.extension.spiderAjax.SpiderListener.ResourceState;
 import org.zaproxy.zap.extension.spiderAjax.SpiderThread;
 import org.zaproxy.zap.extension.spiderAjax.internal.ExcludedElement;
 import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.Stats;
 
-public class AjaxSpiderJob extends AutomationJob implements LongRunningJob {
+public class AjaxSpiderJob extends AutomationJob {
 
     private static final String JOB_NAME = "spiderAjax";
-    private static final String AJAX_SPIDER_ID = "ajaxspider-1";
     private static final String OPTIONS_METHOD_NAME = "getAjaxSpiderParam";
 
     private static final String PARAM_CONTEXT = "context";
@@ -82,6 +79,8 @@ public class AjaxSpiderJob extends AutomationJob implements LongRunningJob {
     private Parameters parameters = new Parameters();
     private boolean forceStop;
     private volatile SpiderThread currentSpiderThread;
+
+    private static int scanIdCounter = 0;
 
     public AjaxSpiderJob() {
         this.data = new Data(this, parameters);
@@ -393,12 +392,17 @@ public class AjaxSpiderJob extends AutomationJob implements LongRunningJob {
     }
 
     @Override
-    public String getScanId() {
-        return AJAX_SPIDER_ID;
+    public boolean isLongRunningJob() {
+        return true;
     }
 
     @Override
-    public int getScanProgress() {
+    public String getLongRunningJobId() {
+        return "ajaxspider-" + scanIdCounter++;
+    }
+
+    @Override
+    public int getLongRunningJobProgress() {
         SpiderThread spider = currentSpiderThread;
         if (spider != null && spider.isRunning()) {
             return 0;

@@ -137,7 +137,7 @@ public class AlertInstancesResource implements McpResource {
         } catch (DatabaseException e) {
             LOGGER.error(e.getMessage(), e);
             return McpResource.errorJson(
-                    Constant.messages.getString("mcp.resource.alertinstances.error.internal"));
+                    Constant.messages.getString("mcp.resource.error.internal"));
         }
     }
 }

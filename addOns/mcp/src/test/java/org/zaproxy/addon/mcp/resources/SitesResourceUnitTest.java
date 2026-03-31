@@ -20,16 +20,12 @@
 package org.zaproxy.addon.mcp.resources;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsInAnyOrder;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.withSettings;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -64,32 +60,40 @@ class SitesResourceUnitTest {
 
     @Test
     void shouldHaveCorrectUriAndName() {
+        // Given / When / Then
         assertThat(resource.getUri(), equalTo("zap://sites"));
         assertThat(resource.getName(), equalTo("sites"));
     }
 
     @Test
     void shouldReturnEmptyArrayWhenRootIsNull() {
+        // Given
         given(siteMap.getRoot()).willReturn(null);
 
+        // When
         String content = resource.readContent();
 
-        assertThat(parseJsonArray(content).size(), equalTo(0));
+        // Then
+        assertThat(content, equalTo("[]"));
     }
 
     @Test
     void shouldReturnEmptyArrayWhenRootHasNoChildren() {
+        // Given
         SiteNode root = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
         given(siteMap.getRoot()).willReturn(root);
         given(root.getChildCount()).willReturn(0);
 
+        // When
         String content = resource.readContent();
 
-        assertThat(parseJsonArray(content).size(), equalTo(0));
+        // Then
+        assertThat(content, equalTo("[]"));
     }
 
     @Test
     void shouldReturnTopLevelSitesWhenRootHasChildren() {
+        // Given
         SiteNode root = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
         SiteNode child1 = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
         SiteNode child2 = mock(SiteNode.class, withSettings().strictness(Strictness.LENIENT));
@@ -102,22 +106,10 @@ class SitesResourceUnitTest {
         given(child1.getHierarchicNodeName()).willReturn("https://example.com");
         given(child2.getHierarchicNodeName()).willReturn("https://other.com");
 
+        // When
         String content = resource.readContent();
-        JsonNode array = parseJsonArray(content);
 
-        assertThat(array.size(), equalTo(2));
-        List<String> sites = new ArrayList<>();
-        for (int i = 0; i < array.size(); i++) {
-            sites.add(array.get(i).asText());
-        }
-        assertThat(sites, containsInAnyOrder("https://example.com", "https://other.com"));
-    }
-
-    private static JsonNode parseJsonArray(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
+        // Then
+        assertThat(content, equalTo("[\"https://example.com\",\"https://other.com\"]"));
     }
 }

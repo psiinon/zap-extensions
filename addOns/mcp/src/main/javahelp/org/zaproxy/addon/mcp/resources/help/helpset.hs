@@ -3,7 +3,7 @@
   PUBLIC "-//Sun Microsystems Inc.//DTD JavaHelp HelpSet Version 2.0//EN"
          "http://java.sun.com/products/javahelp/helpset_2_0.dtd">
 <helpset version="2.0" xml:lang="en-GB">
-  <title>MCP Server Add-on</title>
+  <title>MCP Integration Add-on</title>
 
   <maps>
      <homeID>addon.mcp</homeID>

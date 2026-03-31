@@ -70,19 +70,16 @@ public class ZapStopSpiderTool implements McpTool {
                             .getExtensionLoader()
                             .getExtension(ExtensionAutomation.class);
 
-            if (extAutomation.getScanProgress(scanId) < 0) {
-                throw new RuntimeException(
-                        new McpToolException(
-                                Constant.messages.getString(
-                                        "mcp.tool.stopspider.error.scanidnotfound", scanId)));
+            if (extAutomation.getLongRunningJobProgress(scanId) < 0) {
+                throw new McpToolException(
+                        Constant.messages.getString(
+                                "mcp.tool.stopspider.error.scanidnotfound", scanId));
             }
 
             extAutomation.stopLongRunningJob(scanId);
+        } catch (McpToolException e) {
+            throw e;
         } catch (Exception e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof McpToolException mte) {
-                throw mte;
-            }
             LOGGER.error("Failed to stop spider", e);
             throw new McpToolException(
                     Constant.messages.getString("mcp.tool.stopspider.error.failed"));

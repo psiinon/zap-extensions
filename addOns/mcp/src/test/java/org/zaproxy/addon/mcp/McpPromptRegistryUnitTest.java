@@ -32,6 +32,10 @@ import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EmptySource;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 
 /** Unit tests for {@link McpPromptRegistry}. */
 class McpPromptRegistryUnitTest {
@@ -51,19 +55,12 @@ class McpPromptRegistryUnitTest {
         assertThat(e.getMessage(), is(equalTo("Prompt must not be null")));
     }
 
-    @Test
-    void shouldRejectPromptWithNullName() {
-        McpPrompt prompt = promptWithName(null);
-
-        IllegalArgumentException e =
-                assertThrows(IllegalArgumentException.class, () -> registry.registerPrompt(prompt));
-
-        assertThat(e.getMessage(), is(equalTo("Prompt name must not be null or blank")));
-    }
-
-    @Test
-    void shouldRejectPromptWithBlankName() {
-        McpPrompt prompt = promptWithName("   ");
+    @ParameterizedTest
+    @NullSource
+    @EmptySource
+    @ValueSource(strings = {" ", "\t"})
+    void shouldRejectPromptWithEmptyName(String name) {
+        McpPrompt prompt = promptWithName(name);
 
         IllegalArgumentException e =
                 assertThrows(IllegalArgumentException.class, () -> registry.registerPrompt(prompt));

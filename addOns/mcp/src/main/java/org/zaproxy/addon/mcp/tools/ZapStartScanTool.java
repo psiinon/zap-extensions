@@ -22,6 +22,7 @@ package org.zaproxy.addon.mcp.tools;
 import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import org.apache.logging.log4j.LogManager;
@@ -33,7 +34,6 @@ import org.parosproxy.paros.model.Session;
 import org.zaproxy.addon.automation.AutomationJob;
 import org.zaproxy.addon.automation.AutomationPlan;
 import org.zaproxy.addon.automation.ExtensionAutomation;
-import org.zaproxy.addon.automation.LongRunningJob;
 import org.zaproxy.addon.mcp.McpTool;
 import org.zaproxy.addon.mcp.McpToolException;
 import org.zaproxy.addon.mcp.McpToolResult;
@@ -89,11 +89,10 @@ public abstract class ZapStartScanTool implements McpTool {
                 try {
                     new URI(target);
                 } catch (Exception e) {
-                    throw new RuntimeException(
-                            new McpToolException(
-                                    Constant.messages.getString(
-                                            getMessageKeyPrefix() + ".error.invalidurl", target),
-                                    e));
+                    throw new McpToolException(
+                            Constant.messages.getString(
+                                    getMessageKeyPrefix() + ".error.invalidurl", target),
+                            e);
                 }
                 String contextName = urlToContextName(target);
                 Context existing = session.getContext(contextName);
@@ -122,10 +121,7 @@ public abstract class ZapStartScanTool implements McpTool {
             extAutomation.runPlanAsync(plan);
 
             try {
-                scanId =
-                        extAutomation
-                                .getScanIdFuture((LongRunningJob) job)
-                                .get(10, TimeUnit.SECONDS);
+                scanId = extAutomation.getScanIdFuture(job).get(10, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 LOGGER.error("Interrupted while starting scan", e);
@@ -134,11 +130,10 @@ public abstract class ZapStartScanTool implements McpTool {
                                 Constant.messages.getString(
                                         getMessageKeyPrefix() + ".error.failed")));
             }
+        } catch (McpToolException e) {
+            LOGGER.warn("Failed to start scan", e);
+            throw e;
         } catch (Exception e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof McpToolException mte) {
-                throw mte;
-            }
             LOGGER.error("Failed to start scan", e);
             throw new McpToolException(
                     Constant.messages.getString(getMessageKeyPrefix() + ".error.failed"));
@@ -155,9 +150,10 @@ public abstract class ZapStartScanTool implements McpTool {
 
     private static String urlToContextName(String url) {
         String result = url.trim();
-        if (result.toLowerCase().startsWith("https://")) {
+        String resultLc = result.toLowerCase(Locale.ROOT);
+        if (resultLc.startsWith("https://")) {
             result = result.substring(8);
-        } else if (result.toLowerCase().startsWith("http://")) {
+        } else if (resultLc.startsWith("http://")) {
             result = result.substring(7);
         }
         return result.isEmpty() ? url : result;

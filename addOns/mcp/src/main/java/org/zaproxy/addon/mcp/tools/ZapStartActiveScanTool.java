@@ -23,8 +23,6 @@ import java.util.Map;
 import org.parosproxy.paros.Constant;
 import org.zaproxy.addon.automation.AutomationJob;
 import org.zaproxy.addon.automation.jobs.ActiveScanJob;
-import org.zaproxy.addon.mcp.McpTool.InputSchema;
-import org.zaproxy.addon.mcp.McpTool.ToolArguments;
 
 /** MCP tool that starts the active scan via an automation plan. */
 public class ZapStartActiveScanTool extends ZapStartScanTool {

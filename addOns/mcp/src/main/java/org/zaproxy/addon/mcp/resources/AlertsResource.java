@@ -26,17 +26,24 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Vector;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
-import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.core.scanner.Alert;
+import org.parosproxy.paros.db.DatabaseException;
+import org.parosproxy.paros.db.RecordAlert;
+import org.parosproxy.paros.db.TableAlert;
+import org.parosproxy.paros.model.Model;
 import org.zaproxy.addon.mcp.McpResource;
-import org.zaproxy.zap.extension.alert.ExtensionAlert;
 
 /**
  * MCP resource that provides a summary of ZAP security alerts (name, risk, alertRef,
  * instanceCount).
  */
 public class AlertsResource implements McpResource {
+
+    private static final Logger LOGGER = LogManager.getLogger(AlertsResource.class);
 
     private static final String URI = "zap://alerts";
 
@@ -57,48 +64,53 @@ public class AlertsResource implements McpResource {
 
     @Override
     public String readContent() {
-        ExtensionAlert extAlert =
-                Control.getSingleton().getExtensionLoader().getExtension(ExtensionAlert.class);
-        if (extAlert == null) {
-            return "[]";
+        try {
+            // This is nasty, but there are no better options in the 2.17 core :(
+            TableAlert tableAlert = Model.getSingleton().getDb().getTableAlert();
+            Vector<Integer> alertIds = tableAlert.getAlertList();
+            Map<String, SummaryEntry> summaryByAlertRef = new LinkedHashMap<>();
+
+            for (Integer alertId : alertIds) {
+
+                RecordAlert recAlert = tableAlert.read(alertId);
+                Alert alert = new Alert(recAlert);
+                summaryByAlertRef.compute(
+                        alert.getAlertRef(),
+                        (k, existing) -> {
+                            if (existing == null) {
+                                return new SummaryEntry(
+                                        alert.getName(),
+                                        alert.getRisk(),
+                                        alert.getPluginId(),
+                                        alert.getAlertRef(),
+                                        alert.isSystemic());
+                            }
+                            existing.incrementCount();
+                            return existing;
+                        });
+            }
+
+            List<SummaryEntry> entries = new ArrayList<>(summaryByAlertRef.values());
+            entries.sort(Comparator.comparingInt((SummaryEntry e) -> e.risk).reversed());
+
+            ArrayNode array = OBJECT_MAPPER.createArrayNode();
+            for (SummaryEntry entry : entries) {
+                ObjectNode node = OBJECT_MAPPER.createObjectNode();
+                node.put("name", entry.name);
+                node.put("risk", Alert.MSG_RISK[entry.risk]);
+                node.put("pluginId", entry.pluginId);
+                node.put("alertRef", entry.alertRef);
+                node.put("systemic", entry.systemic);
+                node.put("instanceCount", entry.instanceCount);
+                node.put("instancesUri", "zap://alerts/" + entry.alertRef);
+                array.add(node);
+            }
+            return array.toString();
+        } catch (DatabaseException e) {
+            LOGGER.error(e.getMessage(), e);
+            return McpResource.errorJson(
+                    Constant.messages.getString("mcp.resource.error.internal"));
         }
-
-        List<Alert> alerts = extAlert.getAllAlerts();
-        Map<String, SummaryEntry> summaryByAlertRef = new LinkedHashMap<>();
-
-        for (Alert alert : alerts) {
-            summaryByAlertRef.compute(
-                    alert.getAlertRef(),
-                    (k, existing) -> {
-                        if (existing == null) {
-                            return new SummaryEntry(
-                                    alert.getName(),
-                                    alert.getRisk(),
-                                    alert.getPluginId(),
-                                    alert.getAlertRef(),
-                                    alert.isSystemic());
-                        }
-                        existing.incrementCount();
-                        return existing;
-                    });
-        }
-
-        List<SummaryEntry> entries = new ArrayList<>(summaryByAlertRef.values());
-        entries.sort(Comparator.comparingInt((SummaryEntry e) -> e.risk).reversed());
-
-        ArrayNode array = OBJECT_MAPPER.createArrayNode();
-        for (SummaryEntry entry : entries) {
-            ObjectNode node = OBJECT_MAPPER.createObjectNode();
-            node.put("name", entry.name);
-            node.put("risk", Alert.MSG_RISK[entry.risk]);
-            node.put("pluginId", entry.pluginId);
-            node.put("alertRef", entry.alertRef);
-            node.put("systemic", entry.systemic);
-            node.put("instanceCount", entry.instanceCount);
-            node.put("instancesUri", "zap://alerts/" + entry.alertRef);
-            array.add(node);
-        }
-        return array.toString();
     }
 
     private static class SummaryEntry {

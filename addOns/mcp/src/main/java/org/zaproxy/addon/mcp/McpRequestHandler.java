@@ -56,8 +56,9 @@ class McpRequestHandler {
     /** JSON-RPC 2.0: Server error (implementation-defined). Used for transport-level rejections. */
     static final int ERROR_SERVER = -32000;
 
+    static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+
     private static final Logger LOGGER = LogManager.getLogger(McpRequestHandler.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String PROTOCOL_VERSION = "2024-11-05";
 
     private final McpToolRegistry toolRegistry;
@@ -98,7 +99,7 @@ class McpRequestHandler {
                     result = handleInitialize(requestObj);
                     break;
                 case "notifications/initialized":
-                    result = handleInitialized();
+                    result = null;
                     break;
                 case "ping":
                     result = handlePing(id);
@@ -150,10 +151,6 @@ class McpRequestHandler {
         return jsonRpcResponse(request.get("id"), result);
     }
 
-    private String handleInitialized() {
-        return null;
-    }
-
     private String handlePing(JsonNode id) {
         return jsonRpcResponse(id, OBJECT_MAPPER.createObjectNode());
     }
@@ -162,11 +159,15 @@ class McpRequestHandler {
         ArrayNode toolsArray = OBJECT_MAPPER.createArrayNode();
 
         for (McpTool tool : toolRegistry.getTools()) {
-            ObjectNode toolNode = OBJECT_MAPPER.createObjectNode();
-            toolNode.put("name", tool.getName());
-            toolNode.put("description", tool.getDescription());
-            toolNode.set("inputSchema", toSchemaNode(tool.getInputSchema()));
-            toolsArray.add(toolNode);
+            try {
+                ObjectNode toolNode = OBJECT_MAPPER.createObjectNode();
+                toolNode.put("name", tool.getName());
+                toolNode.put("description", tool.getDescription());
+                toolNode.set("inputSchema", toSchemaNode(tool.getInputSchema()));
+                toolsArray.add(toolNode);
+            } catch (Exception e) {
+                LOGGER.warn("Failed to get tool details", e);
+            }
         }
 
         ObjectNode result = OBJECT_MAPPER.createObjectNode();
@@ -219,12 +220,16 @@ class McpRequestHandler {
     private String handleResourcesList(JsonNode id) {
         ArrayNode resourcesArray = OBJECT_MAPPER.createArrayNode();
         for (McpResource resource : resourceRegistry.getResources()) {
-            ObjectNode entry = OBJECT_MAPPER.createObjectNode();
-            entry.put("uri", resource.getUriTemplate());
-            entry.put("name", resource.getName());
-            entry.put("description", resource.getDescription());
-            entry.put("mimeType", resource.getMimeType());
-            resourcesArray.add(entry);
+            try {
+                ObjectNode entry = OBJECT_MAPPER.createObjectNode();
+                entry.put("uri", resource.getUriTemplate());
+                entry.put("name", resource.getName());
+                entry.put("description", resource.getDescription());
+                entry.put("mimeType", resource.getMimeType());
+                resourcesArray.add(entry);
+            } catch (Exception e) {
+                LOGGER.warn("Failed to get resource details", e);
+            }
         }
         ObjectNode result = OBJECT_MAPPER.createObjectNode();
         result.set("resources", resourcesArray);

@@ -25,8 +25,6 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.withSettings;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -41,7 +39,6 @@ import org.zaproxy.zap.utils.I18N;
 /** Unit tests for {@link HistoryResource}. */
 class HistoryResourceUnitTest {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private ExtensionLoader extensionLoader;
     private ExtensionHistory extHistory;
     private HistoryResource resource;
@@ -67,18 +64,8 @@ class HistoryResourceUnitTest {
     void shouldReturnSummaryWithCountFromExtensionHistory() {
         given(extHistory.getLastHistoryId()).willReturn(42);
 
-        String content = resource.readContent();
-        JsonNode json = parseJson(content);
-
-        assertThat(json.get("count").asInt(), equalTo(42));
-        assertThat(json.has("note"), equalTo(true));
-    }
-
-    private static JsonNode parseJson(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
+        assertThat(
+                resource.readContent(),
+                equalTo("{\"count\":42,\"note\":\"!mcp.resource.history.summary.note!\"}"));
     }
 }

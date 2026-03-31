@@ -40,10 +40,7 @@ import org.parosproxy.paros.network.HttpRequestHeader;
 import org.zaproxy.addon.mcp.McpResource;
 import org.zaproxy.zap.model.NameValuePair;
 
-/**
- * MCP resource that provides the ZAP sites tree in the format defined at
- * https://www.zaproxy.org/docs/desktop/addons/import-export/sitestreeformat/
- */
+/** MCP resource that provides the ZAP sites tree in the format. */
 public class SitesTreeResource implements McpResource {
 
     private static final String ROOT_NODE_NAME = "Sites";

@@ -51,7 +51,7 @@ public class ScanStatusResource implements McpResource {
     public String readContent() {
         ExtensionAutomation extAutomation =
                 Control.getSingleton().getExtensionLoader().getExtension(ExtensionAutomation.class);
-        Map<String, Integer> allProgress = extAutomation.getAllScanProgress();
+        Map<String, Integer> allProgress = extAutomation.getAllLongRunningJobProgresses();
 
         ArrayNode array = OBJECT_MAPPER.createArrayNode();
         for (Map.Entry<String, Integer> entry : allProgress.entrySet()) {

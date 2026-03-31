@@ -1,7 +1,7 @@
-description = "An add-on that implements an MCP server in ZAP."
+description = "An add-on that integrates MCP in ZAP."
 
 zapAddOn {
-    addOnName.set("MCP Server")
+    addOnName.set("MCP Integration")
 
     manifest {
         author.set("ZAP Dev Team")
@@ -38,7 +38,10 @@ dependencies {
     zapAddOn("reports")
 
     testImplementation(project(":testutils"))
+    testImplementation(project(":addOns:graaljs"))
 }
+
+sourceSets.test.get().resources.srcDirs("src/main/zapHomeFiles")
 
 crowdin {
     configuration {

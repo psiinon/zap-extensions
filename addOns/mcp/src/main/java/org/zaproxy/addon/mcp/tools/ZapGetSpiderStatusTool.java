@@ -73,12 +73,11 @@ public class ZapGetSpiderStatusTool implements McpTool {
                             .getExtensionLoader()
                             .getExtension(ExtensionAutomation.class);
 
-            int progress = extAutomation.getScanProgress(scanId);
+            int progress = extAutomation.getLongRunningJobProgress(scanId);
             if (progress < 0) {
-                throw new RuntimeException(
-                        new McpToolException(
-                                Constant.messages.getString(
-                                        "mcp.tool.getspiderstatus.error.scanidnotfound", scanId)));
+                throw new McpToolException(
+                        Constant.messages.getString(
+                                "mcp.tool.getspiderstatus.error.scanidnotfound", scanId));
             }
 
             String status =
@@ -91,11 +90,9 @@ public class ZapGetSpiderStatusTool implements McpTool {
                     .append(
                             Constant.messages.getString(
                                     "mcp.tool.getspiderstatus.progress", progress));
+        } catch (McpToolException e) {
+            throw e;
         } catch (Exception e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof McpToolException mte) {
-                throw mte;
-            }
             LOGGER.error("Failed to get spider status", e);
             throw new McpToolException(
                     Constant.messages.getString("mcp.tool.getspiderstatus.error.failed"));

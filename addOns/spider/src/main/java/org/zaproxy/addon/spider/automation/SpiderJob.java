@@ -44,9 +44,9 @@ import org.parosproxy.paros.network.HttpStatusCode;
 import org.zaproxy.addon.automation.AutomationData;
 import org.zaproxy.addon.automation.AutomationEnvironment;
 import org.zaproxy.addon.automation.AutomationJob;
+import org.zaproxy.addon.automation.AutomationJob.Status;
 import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.ContextWrapper;
-import org.zaproxy.addon.automation.LongRunningJob;
 import org.zaproxy.addon.automation.jobs.JobData;
 import org.zaproxy.addon.automation.jobs.JobUtils;
 import org.zaproxy.addon.automation.tests.AbstractAutomationTest;
@@ -62,7 +62,7 @@ import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.Stats;
 import org.zaproxy.zap.utils.ThreadUtils;
 
-public class SpiderJob extends AutomationJob implements LongRunningJob {
+public class SpiderJob extends AutomationJob {
 
     public static final String JOB_NAME = "spider";
     private static final String OPTIONS_METHOD_NAME = "getSpiderParam";
@@ -269,7 +269,7 @@ public class SpiderJob extends AutomationJob implements LongRunningJob {
                     break;
                 }
             }
-            if (forceStop && scanId != null) {
+            if (forceStop) {
                 this.getExtSpider().stopScan(scanId);
                 progress.info(Constant.messages.getString("automation.info.jobstopped", getType()));
             }
@@ -291,12 +291,17 @@ public class SpiderJob extends AutomationJob implements LongRunningJob {
     }
 
     @Override
-    public String getScanId() {
+    public boolean isLongRunningJob() {
+        return true;
+    }
+
+    @Override
+    public String getLongRunningJobId() {
         return scanId != null ? "spider-" + scanId : null;
     }
 
     @Override
-    public int getScanProgress() {
+    public int getLongRunningJobProgress() {
         SpiderScan scan = currentScan;
         if (scan != null) {
             return scan.getProgress();

@@ -8,16 +8,16 @@
 // This script demonstrates how to register a custom MCP resource with the ZAP
 // MCP Server. The MCP add-on must be installed for this to work.
 
-var Control = Java.type("org.parosproxy.paros.control.Control");
-var ExtensionMcp = Java.type("org.zaproxy.addon.mcp.ExtensionMcp");
-var McpResource = Java.type("org.zaproxy.addon.mcp.McpResource");
+const ExtensionMcp = Java.type("org.zaproxy.addon.mcp.ExtensionMcp");
+const McpResource = Java.type("org.zaproxy.addon.mcp.McpResource");
 
+const RESOURCE_URI = "zap://example-resource";
 const NAME = "example-resource";
 
 function newResource() {
   return new (Java.extend(McpResource)) {
     getUri: function() {
-      return "zap://example-resource";
+      return RESOURCE_URI;
     },
 
     getName: function() {
@@ -28,23 +28,12 @@ function newResource() {
       return "An example MCP resource that returns sample data. Use this as a template for custom resources.";
     },
 
-    getMimeType: function() {
-      return "application/json";
-    },
-
-    toListEntry: function() {
-      var node = McpResource.OBJECT_MAPPER.createObjectNode();
-      node.put("uri", this.getUri());
-      node.put("name", this.getName());
-      node.put("description", this.getDescription());
-      node.put("mimeType", this.getMimeType());
-      return node;
-    },
-
-    readContent: function(uri) {
+    readContent: function() {
       var content = McpResource.OBJECT_MAPPER.createObjectNode();
       content.put("message", "This is an example MCP resource");
-      content.put("uri", uri || this.getUri());
+	  content.put("uri", this.getUri());
+	  content.put("name", this.getName());
+	  content.put("description", this.getDescription());
       content.put("timestamp", new Date().toISOString());
       return content.toString();
     }
@@ -77,6 +66,6 @@ function install(helper) {
 function uninstall(helper) {
   var extMcp = control.getExtensionLoader().getExtension(ExtensionMcp);
   if (extMcp !== null) {
-    extMcp.getResourceRegistry().unregisterResource(NAME);
+    extMcp.getResourceRegistry().unregisterResource(RESOURCE_URI);
   }
 }

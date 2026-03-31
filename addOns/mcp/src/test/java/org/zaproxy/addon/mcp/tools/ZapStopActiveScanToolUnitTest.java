@@ -100,7 +100,7 @@ class ZapStopActiveScanToolUnitTest {
 
     @Test
     void shouldThrowExceptionWhenScanNotFound() {
-        given(extAutomation.getScanProgress("ascan-1")).willReturn(-1);
+        given(extAutomation.getLongRunningJobProgress("ascan-1")).willReturn(-1);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ascan-1"), Map.of());
 
         McpToolException ex =
@@ -114,7 +114,7 @@ class ZapStopActiveScanToolUnitTest {
 
     @Test
     void shouldStopScanSuccessfully() throws McpToolException {
-        given(extAutomation.getScanProgress("ascan-1")).willReturn(50);
+        given(extAutomation.getLongRunningJobProgress("ascan-1")).willReturn(50);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ascan-1"), Map.of());
 
         tool.execute(args);
@@ -124,7 +124,7 @@ class ZapStopActiveScanToolUnitTest {
 
     @Test
     void shouldReturnSuccessMessageOnStop() throws McpToolException {
-        given(extAutomation.getScanProgress("ascan-1")).willReturn(50);
+        given(extAutomation.getLongRunningJobProgress("ascan-1")).willReturn(50);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ascan-1"), Map.of());
 
         McpToolResult result = tool.execute(args);

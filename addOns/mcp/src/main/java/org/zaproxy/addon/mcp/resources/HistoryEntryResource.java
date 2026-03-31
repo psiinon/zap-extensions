@@ -94,11 +94,6 @@ public class HistoryEntryResource implements McpResource {
                                 "mcp.resource.historyentry.error.notfound", id));
             }
             HttpMessage msg = href.getHttpMessage();
-            if (msg == null) {
-                return McpResource.errorJson(
-                        Constant.messages.getString(
-                                "mcp.resource.historyentry.error.notfound", id));
-            }
             ObjectNode result = OBJECT_MAPPER.createObjectNode();
             result.put("requestHeader", msg.getRequestHeader().toString());
             result.put("requestBody", msg.getRequestBody().toString());

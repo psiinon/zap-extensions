@@ -19,7 +19,6 @@
  */
 package org.zaproxy.addon.mcp;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -43,7 +42,6 @@ import org.zaproxy.addon.network.server.HttpMessageHandlerContext;
 class McpHttpMessageHandler implements HttpMessageHandler {
 
     private static final Logger LOGGER = LogManager.getLogger(McpHttpMessageHandler.class);
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final McpParam param;
     private final McpRequestHandler requestHandler;
@@ -111,7 +109,7 @@ class McpHttpMessageHandler implements HttpMessageHandler {
             }
 
             String requestBody = msg.getRequestBody().toString();
-            if (requestBody == null || requestBody.isBlank()) {
+            if (requestBody.isBlank()) {
                 setErrorResponse(msg, HttpStatusCode.BAD_REQUEST, "Request body required");
                 recordInHistoryIfEnabled(msg);
                 return;
@@ -199,18 +197,15 @@ class McpHttpMessageHandler implements HttpMessageHandler {
                         + getCorsHeaders();
         msg.setResponseHeader(header);
         msg.setResponseBody("");
-        if ("HTTP/2".equalsIgnoreCase(msg.getRequestHeader().getVersion())) {
-            msg.getResponseHeader().setHeader(HttpHeader.CONNECTION, null);
-        }
     }
 
     private void setErrorResponse(HttpMessage msg, int statusCode, String message)
             throws HttpMalformedHeaderException {
         int jsonRpcCode = httpStatusToJsonRpcCode(statusCode);
-        ObjectNode error = OBJECT_MAPPER.createObjectNode();
+        ObjectNode error = McpRequestHandler.OBJECT_MAPPER.createObjectNode();
         error.put("code", jsonRpcCode);
         error.put("message", message);
-        ObjectNode body = OBJECT_MAPPER.createObjectNode();
+        ObjectNode body = McpRequestHandler.OBJECT_MAPPER.createObjectNode();
         body.put("jsonrpc", "2.0");
         body.set("error", error);
         setJsonResponse(msg, statusCode, body.toString());

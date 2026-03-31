@@ -20,14 +20,11 @@
 package org.zaproxy.addon.mcp.resources;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.withSettings;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Locale;
 import java.util.Vector;
@@ -48,7 +45,6 @@ import org.zaproxy.zap.utils.I18N;
 /** Unit tests for {@link AlertInstancesResource}. */
 class AlertInstancesResourceUnitTest {
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private ExtensionLoader extensionLoader;
     private ExtensionAlert extAlert;
     private TableAlert tableAlert;
@@ -82,65 +78,85 @@ class AlertInstancesResourceUnitTest {
 
     @Test
     void shouldReturnErrorForInvalidUri() {
+        // Given / When
         String content = resource.readContent("zap://other/100-1");
 
-        JsonNode json = parseJson(content);
-        assertThat(json.has("error"), equalTo(true));
-        assertThat(json.get("error").asText(), containsString("invalid"));
+        // Then
+        assertThat(
+                content, equalTo("{\"error\":\"!mcp.resource.alertinstances.error.invaliduri!\"}"));
     }
 
     @Test
     void shouldReturnErrorForMissingAlertRef() {
+        // Given / When
         String content = resource.readContent("zap://alerts/");
 
-        JsonNode json = parseJson(content);
-        assertThat(json.has("error"), equalTo(true));
-        // Matches both resolved message ("AlertRef required...") and unresolved key
-        assertThat(json.get("error").asText().toLowerCase(), containsString("alertref"));
+        // Then
+        assertThat(
+                content,
+                equalTo("{\"error\":\"!mcp.resource.alertinstances.error.missingalertref!\"}"));
     }
 
     @Test
     void shouldReturnEmptyArrayWhenExtensionAlertNotInstalled() {
+        // Given
         given(extensionLoader.getExtension(ExtensionAlert.class)).willReturn(null);
 
+        // When
         String content = resource.readContent("zap://alerts/100-1");
 
-        assertThat(parseJsonArray(content).size(), equalTo(0));
+        // Then
+        assertThat(content, equalTo("[]"));
     }
 
     @Test
     void shouldReturnInstancesWithRiskAndConfidenceAsStrings() throws Exception {
+        // Given
         RecordAlert rec =
                 mockRecordAlert(1, 100, "100-1", Alert.RISK_HIGH, Alert.CONFIDENCE_MEDIUM, "XSS");
         given(tableAlert.getAlertList()).willReturn(new Vector<>(List.of(1)));
         given(tableAlert.read(1)).willReturn(rec);
 
+        // When
         String content = resource.readContent("zap://alerts/100-1");
-        JsonNode array = parseJsonArray(content);
 
-        assertThat(array.size(), equalTo(1));
-        assertThat(array.get(0).get("risk").asText(), equalTo(Alert.MSG_RISK[Alert.RISK_HIGH]));
+        // Then
         assertThat(
-                array.get(0).get("confidence").asText(),
-                equalTo(Alert.MSG_CONFIDENCE[Alert.CONFIDENCE_MEDIUM]));
-        assertThat(array.get(0).get("name").asText(), equalTo("XSS"));
-        assertThat(array.get(0).get("alertRef").asText(), equalTo("100-1"));
+                content,
+                equalTo(
+                        "[{\"name\":\"XSS\","
+                                + "\"description\":\"\","
+                                + "\"solution\":\"\","
+                                + "\"risk\":\"High\","
+                                + "\"confidence\":\"Medium\","
+                                + "\"uri\":\"\","
+                                + "\"param\":\"\","
+                                + "\"attack\":\"\","
+                                + "\"evidence\":\"\","
+                                + "\"other\":\"\","
+                                + "\"pluginId\":100,"
+                                + "\"alertRef\":\"100-1\","
+                                + "\"systemic\":false}]"));
     }
 
     @Test
     void shouldReturnEmptyArrayWhenNoMatchingAlertRef() throws Exception {
+        // Given
         RecordAlert rec =
                 mockRecordAlert(1, 100, "100-1", Alert.RISK_HIGH, Alert.CONFIDENCE_MEDIUM, "XSS");
         given(tableAlert.getAlertList()).willReturn(new Vector<>(List.of(1)));
         given(tableAlert.read(1)).willReturn(rec);
 
+        // When
         String content = resource.readContent("zap://alerts/200-1");
 
-        assertThat(parseJsonArray(content).size(), equalTo(0));
+        // Then
+        assertThat(content, equalTo("[]"));
     }
 
     @Test
     void shouldReturnOnlyMatchingInstances() throws Exception {
+        // Given
         RecordAlert rec1 =
                 mockRecordAlert(1, 100, "100-1", Alert.RISK_HIGH, Alert.CONFIDENCE_MEDIUM, "XSS");
         RecordAlert rec2 =
@@ -152,19 +168,51 @@ class AlertInstancesResourceUnitTest {
         given(tableAlert.read(2)).willReturn(rec2);
         given(tableAlert.read(3)).willReturn(rec3);
 
+        // When
         String content = resource.readContent("zap://alerts/100-1");
-        JsonNode array = parseJsonArray(content);
 
-        assertThat(array.size(), equalTo(2));
+        // Then
+        assertThat(
+                content,
+                equalTo(
+                        "[{\"name\":\"XSS\","
+                                + "\"description\":\"\","
+                                + "\"solution\":\"\","
+                                + "\"risk\":\"High\","
+                                + "\"confidence\":\"Medium\","
+                                + "\"uri\":\"\","
+                                + "\"param\":\"\","
+                                + "\"attack\":\"\","
+                                + "\"evidence\":\"\","
+                                + "\"other\":\"\","
+                                + "\"pluginId\":100,"
+                                + "\"alertRef\":\"100-1\","
+                                + "\"systemic\":false},"
+                                + "{\"name\":\"XSS\","
+                                + "\"description\":\"\","
+                                + "\"solution\":\"\","
+                                + "\"risk\":\"High\","
+                                + "\"confidence\":\"Medium\","
+                                + "\"uri\":\"\","
+                                + "\"param\":\"\","
+                                + "\"attack\":\"\","
+                                + "\"evidence\":\"\","
+                                + "\"other\":\"\","
+                                + "\"pluginId\":100,"
+                                + "\"alertRef\":\"100-1\","
+                                + "\"systemic\":false}]"));
     }
 
     @Test
     void shouldReturnEmptyArrayWhenNoAlerts() throws Exception {
+        // Given
         given(tableAlert.getAlertList()).willReturn(new Vector<>());
 
+        // When
         String content = resource.readContent("zap://alerts/100-1");
 
-        assertThat(parseJsonArray(content).size(), equalTo(0));
+        // Then
+        assertThat(content, equalTo("[]"));
     }
 
     private static RecordAlert mockRecordAlert(
@@ -185,21 +233,5 @@ class AlertInstancesResourceUnitTest {
         given(rec.getReference()).willReturn("");
         given(rec.getEvidence()).willReturn("");
         return rec;
-    }
-
-    private static JsonNode parseJson(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
-    }
-
-    private static JsonNode parseJsonArray(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
     }
 }

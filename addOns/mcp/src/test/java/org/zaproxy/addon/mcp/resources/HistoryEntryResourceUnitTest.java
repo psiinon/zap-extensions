@@ -20,13 +20,11 @@
 package org.zaproxy.addon.mcp.resources;
 
 import static org.hamcrest.MatcherAssert.assertThat;
-import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.withSettings;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
@@ -62,39 +60,42 @@ class HistoryEntryResourceUnitTest {
 
     @Test
     void shouldReturnErrorForInvalidUri() {
+        // Given / When
         String content = resource.readContent("zap://other/123");
 
-        JsonNode json = parseJson(content);
-        assertThat(json.has("error"), equalTo(true));
-        assertThat(json.get("error").asText(), containsString("invalid"));
+        // Then
+        assertThat(
+                content, equalTo("{\"error\":\"!mcp.resource.historyentry.error.invaliduri!\"}"));
     }
 
     @Test
     void shouldReturnErrorForMissingId() {
+        // Given / When
         String content = resource.readContent("zap://history/");
 
-        JsonNode json = parseJson(content);
-        assertThat(json.has("error"), equalTo(true));
-        assertThat(json.get("error").asText(), containsString("id"));
+        // Then
+        assertThat(content, equalTo("{\"error\":\"!mcp.resource.historyentry.error.missingid!\"}"));
     }
 
     @Test
     void shouldReturnErrorForInvalidId() {
+        // Given / When
         String content = resource.readContent("zap://history/abc");
 
-        JsonNode json = parseJson(content);
-        assertThat(json.has("error"), equalTo(true));
-        assertThat(json.get("error").asText(), containsString("invalid"));
+        // Then
+        assertThat(content, equalTo("{\"error\":\"!mcp.resource.historyentry.error.invalidid!\"}"));
     }
 
     @Test
     void shouldHaveCorrectUriAndName() {
+        // Given / When / Then
         assertThat(resource.getUri(), equalTo("zap://history/"));
         assertThat(resource.getName(), equalTo("history-entry"));
     }
 
     @Test
     void shouldReturnRequestAndResponseWhenHistoryEntryExists() throws Exception {
+        // Given
         HttpMessage msg = new HttpMessage();
         msg.setRequestHeader("GET /test HTTP/1.1\r\nHost: example.com\r\n");
         msg.setRequestBody("request body");
@@ -106,48 +107,28 @@ class HistoryEntryResourceUnitTest {
         given(href.getHttpMessage()).willReturn(msg);
         given(extHistory.getHistoryReference(123)).willReturn(href);
 
+        // When
         String content = resource.readContent("zap://history/123");
-        JsonNode json = parseJson(content);
 
-        assertThat(json.has("error"), equalTo(false));
-        assertThat(json.get("requestHeader").asText(), containsString("GET"));
-        assertThat(json.get("requestBody").asText(), equalTo("request body"));
-        assertThat(json.get("responseHeader").asText(), containsString("HTTP/1.1 200"));
-        assertThat(json.get("responseBody").asText(), equalTo("response body"));
+        // Then
+        assertThat(
+                content,
+                equalTo(
+                        "{"
+                                + "\"requestHeader\":\"GET http://example.com/test HTTP/1.1\\r\\nHost: example.com\\r\\n\\r\\n\","
+                                + "\"requestBody\":\"request body\","
+                                + "\"responseHeader\":\"HTTP/1.1 200 OK\\r\\nContent-Type: text/html\\r\\n\\r\\n\","
+                                + "\"responseBody\":\"response body\"}"));
     }
 
     @Test
     void shouldReturnErrorWhenHistoryEntryNotFound() {
+        // Given / When
         given(extHistory.getHistoryReference(999)).willReturn(null);
 
         String content = resource.readContent("zap://history/999");
-        JsonNode json = parseJson(content);
 
-        assertThat(json.has("error"), equalTo(true));
-        // Matches resolved message ("History ID 999 not found") and unresolved key
-        assertThat(json.get("error").asText().toLowerCase(), containsString("notfound"));
-    }
-
-    @Test
-    void shouldReturnErrorWhenHistoryReferenceHasNoHttpMessage() throws Exception {
-        HistoryReference href =
-                mock(HistoryReference.class, withSettings().strictness(Strictness.LENIENT));
-        given(href.getHttpMessage()).willReturn(null);
-        given(extHistory.getHistoryReference(123)).willReturn(href);
-
-        String content = resource.readContent("zap://history/123");
-        JsonNode json = parseJson(content);
-
-        assertThat(json.has("error"), equalTo(true));
-        // Matches resolved message ("History ID 123 not found") and unresolved key
-        assertThat(json.get("error").asText().toLowerCase(), containsString("notfound"));
-    }
-
-    private static JsonNode parseJson(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
+        // Then
+        assertThat(content, equalTo("{\"error\":\"!mcp.resource.historyentry.error.notfound!\"}"));
     }
 }

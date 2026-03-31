@@ -129,8 +129,8 @@ class AjaxSpiderJobUnitTest {
         assertThat(job.getOrder(), is(equalTo(Order.LAST_EXPLORE)));
         assertThat(job.getParamMethodObject(), is(extAjax));
         assertThat(job.getParamMethodName(), is("getAjaxSpiderParam"));
-        assertThat(job.getScanId(), is(equalTo("ajaxspider-1")));
-        assertThat(job.getScanProgress(), is(equalTo(0)));
+        assertThat(job.getLongRunningJobId(), is(equalTo("ajaxspider-0")));
+        assertThat(job.getLongRunningJobProgress(), is(equalTo(0)));
     }
 
     @Test

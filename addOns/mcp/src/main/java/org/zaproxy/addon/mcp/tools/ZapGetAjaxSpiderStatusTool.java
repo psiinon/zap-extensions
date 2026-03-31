@@ -65,7 +65,7 @@ public class ZapGetAjaxSpiderStatusTool implements McpTool {
         ExtensionAutomation extAutomation =
                 Control.getSingleton().getExtensionLoader().getExtension(ExtensionAutomation.class);
 
-        int progress = extAutomation.getScanProgress(scanId);
+        int progress = extAutomation.getLongRunningJobProgress(scanId);
         if (progress < 0) {
             throw new McpToolException(
                     Constant.messages.getString(
