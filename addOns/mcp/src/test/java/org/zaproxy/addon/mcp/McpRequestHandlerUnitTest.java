@@ -22,10 +22,7 @@ package org.zaproxy.addon.mcp;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.notNullValue;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -38,8 +35,6 @@ import org.zaproxy.zap.utils.I18N;
 
 /** Unit tests for {@link McpRequestHandler}. */
 class McpRequestHandlerUnitTest {
-
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private McpToolRegistry toolRegistry;
     private McpResourceRegistry resourceRegistry;
@@ -65,12 +60,12 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        assertThat(json.get("result").get("protocolVersion").asText(), equalTo("2024-11-05"));
         assertThat(
-                json.get("result").get("serverInfo").get("name").asText(),
-                equalTo("ZAP MCP Server"));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2024-11-05\","
+                                + "\"capabilities\":{\"tools\":{\"listChanged\":true},\"resources\":{\"listChanged\":true},\"prompts\":{\"listChanged\":true}},"
+                                + "\"serverInfo\":{\"name\":\"ZAP MCP Server\",\"version\":\"\"}}}"));
     }
 
     @Test
@@ -79,9 +74,7 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        assertThat(json.has("result"), equalTo(true));
+        assertThat(response, equalTo("{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{}}"));
     }
 
     @Test
@@ -90,12 +83,12 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        JsonNode tools = json.get("result").get("tools");
-        assertThat(tools.isArray(), equalTo(true));
-        assertThat(tools.size(), equalTo(1));
-        assertThat(tools.get(0).get("name").asText(), equalTo("zap_version"));
+        assertThat(
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"tools\":[{\"name\":\"zap_version\","
+                                + "\"description\":\"!mcp.tool.version.desc!\","
+                                + "\"inputSchema\":{\"type\":\"object\",\"properties\":{},\"required\":[]}}]}}"));
     }
 
     @Test
@@ -105,22 +98,18 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        assertThat(json.has("error"), equalTo(false));
-        JsonNode content = json.get("result").get("content").get(0);
-        assertThat(content.get("type").asText(), equalTo("text"));
-        assertThat(content.has("text"), equalTo(true));
+        // The version text is dynamic; assert the envelope structure without it.
+        assertThat(response, containsString("\"isError\":false"));
+        assertThat(response, containsString("\"type\":\"text\""));
     }
 
     @Test
     void shouldReturnErrorForInvalidJson() {
         String response = requestHandler.handleRequest("not json");
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
-        assertThat(json.get("error").get("code").asInt(), equalTo(-32603));
-        assertThat(json.get("error").get("message").asText(), containsString("Internal error"));
+        // The Jackson parse-exception message is dynamic; assert the fixed parts.
+        assertThat(response, containsString("\"code\":-32603"));
+        assertThat(response, containsString("\"message\":\"Internal error:"));
     }
 
     @Test
@@ -129,10 +118,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
         assertThat(
-                json.get("error").get("message").asText(), containsString("method not specified"));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32600,\"message\":\"Invalid Request: method not specified\"}}"));
     }
 
     @Test
@@ -141,12 +131,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
         assertThat(
-                json.get("error").get("code").asInt(),
-                equalTo(McpRequestHandler.ERROR_METHOD_NOT_FOUND));
-        assertThat(json.get("error").get("message").asText(), containsString("Method not found"));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32601,\"message\":\"Method not found: unknown/method\"}}"));
     }
 
     @Test
@@ -156,9 +145,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
-        assertThat(json.get("error").get("message").asText(), containsString("Unknown tool"));
+        assertThat(
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32602,\"message\":\"Unknown tool: unknown_tool\"}}"));
     }
 
     @Test
@@ -169,10 +160,13 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        JsonNode resources = json.get("result").get("resources");
-        assertThat(resources.isArray(), equalTo(true));
+        assertThat(
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"resources\":[{\"uri\":\"zap://history/{id}\","
+                                + "\"name\":\"history-entry\","
+                                + "\"description\":\"!mcp.resource.historyentry.desc!\","
+                                + "\"mimeType\":\"application/json\"}]}}"));
     }
 
     @Test
@@ -182,12 +176,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
         assertThat(
-                json.get("error").get("code").asInt(),
-                equalTo(McpRequestHandler.ERROR_INVALID_PARAMS));
-        assertThat(json.get("error").get("message").asText(), containsString("Unknown resource"));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32602,\"message\":\"Unknown resource: zap://unknown\"}}"));
     }
 
     @Test
@@ -197,11 +190,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
         assertThat(
-                json.get("error").get("code").asInt(),
-                equalTo(McpRequestHandler.ERROR_INVALID_PARAMS));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32602,\"message\":\"Resource URI not specified\"}}"));
     }
 
     @Test
@@ -213,10 +206,12 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        JsonNode capabilities = parseJson(response).get("result").get("capabilities");
-        assertThat(capabilities.has("tools"), equalTo(true));
-        assertThat(capabilities.has("resources"), equalTo(true));
-        assertThat(capabilities.has("prompts"), equalTo(true));
+        assertThat(
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"protocolVersion\":\"2024-11-05\","
+                                + "\"capabilities\":{\"tools\":{\"listChanged\":true},\"resources\":{\"listChanged\":true},\"prompts\":{\"listChanged\":true}},"
+                                + "\"serverInfo\":{\"name\":\"ZAP MCP Server\",\"version\":\"\"}}}"));
     }
 
     @Test
@@ -248,12 +243,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        JsonNode json = parseJson(response);
-        assertThat(json.has("error"), equalTo(false));
-        assertThat(json.get("result").get("isError").asBoolean(), equalTo(true));
         assertThat(
-                json.get("result").get("content").get(0).get("text").asText(),
-                containsString("something went wrong"));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"content\":[{\"type\":\"text\","
+                                + "\"text\":\"something went wrong\"}],\"isError\":true}}"));
     }
 
     @Test
@@ -286,18 +280,12 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        JsonNode prompts = json.get("result").get("prompts");
-        assertThat(prompts.isArray(), equalTo(true));
-        assertThat(prompts.size(), equalTo(1));
-        JsonNode prompt = prompts.get(0);
-        assertThat(prompt.get("name").asText(), equalTo("test_prompt"));
-        assertThat(prompt.get("description").asText(), equalTo("A test prompt"));
-        JsonNode args = prompt.get("arguments");
-        assertThat(args.size(), equalTo(1));
-        assertThat(args.get(0).get("name").asText(), equalTo("target"));
-        assertThat(args.get(0).get("required").asBoolean(), equalTo(true));
+        assertThat(
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"prompts\":[{\"name\":\"test_prompt\","
+                                + "\"description\":\"A test prompt\","
+                                + "\"arguments\":[{\"name\":\"target\",\"description\":\"The target\",\"required\":true}]}]}}"));
     }
 
     @Test
@@ -333,16 +321,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, notNullValue());
-        JsonNode json = parseJson(response);
-        assertThat(json.has("error"), equalTo(false));
-        JsonNode messages = json.get("result").get("messages");
-        assertThat(messages.isArray(), equalTo(true));
-        assertThat(messages.size(), equalTo(1));
-        JsonNode msg = messages.get(0);
-        assertThat(msg.get("role").asText(), equalTo("user"));
-        assertThat(msg.get("content").get("type").asText(), equalTo("text"));
-        assertThat(msg.get("content").get("text").asText(), equalTo("Hello World"));
+        assertThat(
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"description\":\"A greeting prompt\","
+                                + "\"messages\":[{\"role\":\"user\",\"content\":{\"type\":\"text\",\"text\":\"Hello World\"}}]}}"));
     }
 
     @Test
@@ -352,12 +335,11 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
         assertThat(
-                json.get("error").get("code").asInt(),
-                equalTo(McpRequestHandler.ERROR_INVALID_PARAMS));
-        assertThat(json.get("error").get("message").asText(), containsString("Unknown prompt"));
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32602,\"message\":\"Unknown prompt: no_such_prompt\"}}"));
     }
 
     @Test
@@ -366,18 +348,10 @@ class McpRequestHandlerUnitTest {
 
         String response = requestHandler.handleRequest(request);
 
-        assertThat(response, containsString("\"error\""));
-        JsonNode json = parseJson(response);
         assertThat(
-                json.get("error").get("code").asInt(),
-                equalTo(McpRequestHandler.ERROR_INVALID_PARAMS));
-    }
-
-    private static JsonNode parseJson(String json) {
-        try {
-            return OBJECT_MAPPER.readTree(json);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to parse JSON: " + json, e);
-        }
+                response,
+                equalTo(
+                        "{\"jsonrpc\":\"2.0\",\"id\":1,"
+                                + "\"error\":{\"code\":-32602,\"message\":\"Prompt name not specified\"}}"));
     }
 }
