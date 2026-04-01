@@ -115,6 +115,9 @@ public class McpImporter {
             return new ImportResults(requestCount, errors);
         }
 
+        // 1b. notifications/initialized — completes the initialization phase
+        sendNotification(serverUri, "notifications/initialized", config.securityKey(), errors);
+
         // 2. tools/list
         List<ToolDef> tools = new ArrayList<>();
         HttpMessage toolsListMsg =
@@ -199,6 +202,50 @@ public class McpImporter {
         }
 
         return new ImportResults(requestCount, errors);
+    }
+
+    /**
+     * Sends a JSON-RPC notification (no {@code id} field) and records it in history. Notifications
+     * do not carry a response body, so the recorded message captures the server's acknowledgement
+     * (typically HTTP 202) without attempting to parse a JSON-RPC result.
+     */
+    private void sendNotification(
+            URI serverUri, String method, String securityKey, List<String> errors) {
+        HttpMessage msg = buildNotification(serverUri, method, securityKey);
+        if (msg == null) {
+            return;
+        }
+        try {
+            httpSender.sendAndReceive(msg);
+        } catch (IOException e) {
+            LOGGER.warn("MCP notification failed for method {}: {}", method, e.getMessage());
+            return;
+        }
+        recordMessage(msg);
+    }
+
+    private HttpMessage buildNotification(URI serverUri, String method, String securityKey) {
+        try {
+            ObjectNode body = MAPPER.createObjectNode();
+            body.put("jsonrpc", "2.0");
+            body.put("method", method);
+
+            HttpMessage msg = new HttpMessage(serverUri);
+            msg.getRequestHeader().setMethod(HttpRequestHeader.POST);
+            msg.getRequestHeader().setHeader(HttpHeader.CONTENT_TYPE, CONTENT_TYPE);
+            if (securityKey != null && !securityKey.isBlank()) {
+                msg.getRequestHeader().setHeader("Authorization", securityKey);
+            }
+
+            String bodyStr = MAPPER.writeValueAsString(body);
+            msg.setRequestBody(bodyStr);
+            msg.getRequestHeader().setContentLength(msg.getRequestBody().length());
+            return msg;
+        } catch (Exception e) {
+            LOGGER.warn(
+                    "Failed to build MCP notification for method {}: {}", method, e.getMessage());
+            return null;
+        }
     }
 
     private HttpMessage sendAndRecord(

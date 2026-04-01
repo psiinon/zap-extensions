@@ -27,7 +27,6 @@ import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.control.Control;
 import org.parosproxy.paros.extension.history.ExtensionHistory;
 import org.parosproxy.paros.model.HistoryReference;
-import org.parosproxy.paros.network.HttpHeader;
 import org.parosproxy.paros.network.HttpMalformedHeaderException;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpRequestHeader;
@@ -183,9 +182,6 @@ class McpHttpMessageHandler implements HttpMessageHandler {
         msg.setResponseHeader(header);
         msg.setResponseBody(body);
         msg.getResponseHeader().setContentLength(body.length());
-        if ("HTTP/2".equalsIgnoreCase(msg.getRequestHeader().getVersion())) {
-            msg.getResponseHeader().setHeader(HttpHeader.CONNECTION, null);
-        }
     }
 
     private void setAcceptedResponse(HttpMessage msg) throws HttpMalformedHeaderException {

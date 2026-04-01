@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## Unreleased
 
 
+## [0.37.0] - 2026-03-31
+### Added
+- Support for Microsoft login in a pop-up window
+
 ## [0.36.0] - 2026-03-19
 ### Changed
 - Maintenance changes.
@@ -358,6 +362,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 - Support of authentication request identification and configuration.
 
+[0.37.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.37.0
 [0.36.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.36.0
 [0.35.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.35.0
 [0.34.0]: https://github.com/zaproxy/zap-extensions/releases/authhelper-v0.34.0

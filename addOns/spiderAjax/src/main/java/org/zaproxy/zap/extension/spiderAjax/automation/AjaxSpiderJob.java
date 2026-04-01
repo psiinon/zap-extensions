@@ -79,6 +79,7 @@ public class AjaxSpiderJob extends AutomationJob {
     private Parameters parameters = new Parameters();
     private boolean forceStop;
     private volatile SpiderThread currentSpiderThread;
+    private String jobId;
 
     private static int scanIdCounter = 0;
 
@@ -338,6 +339,7 @@ public class AjaxSpiderJob extends AutomationJob {
                                 listener);
         currentSpiderThread = spiderThread;
         new Thread(spiderThread, "ZAP-AjaxSpiderAuto").start();
+        jobId = "ajaxspider-" + scanIdCounter++;
 
         int waitAttempts = 0;
         while (!spiderThread.isRunning() && waitAttempts < 20) {
@@ -398,7 +400,7 @@ public class AjaxSpiderJob extends AutomationJob {
 
     @Override
     public String getLongRunningJobId() {
-        return "ajaxspider-" + scanIdCounter++;
+        return jobId;
     }
 
     @Override

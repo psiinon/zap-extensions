@@ -29,7 +29,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public interface McpResource {
 
     public static final String MIME_TYPE = "application/json";
-    public static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    public static final ObjectMapper OBJECT_MAPPER = McpRequestHandler.OBJECT_MAPPER;
 
     /**
      * Returns the unique URI of the resource. Used as the identifier when reading the resource.

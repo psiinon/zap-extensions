@@ -76,8 +76,7 @@ class ZapStopAjaxSpiderToolUnitTest {
     void shouldThrowExceptionWhenScanIdNull() {
         ToolArguments args = new ToolArguments(Map.of(), Map.of());
 
-        McpToolException ex =
-                assertThrows(McpToolException.class, () -> tool.execute(args));
+        McpToolException ex = assertThrows(McpToolException.class, () -> tool.execute(args));
         assertThat(
                 ex.getMessage(),
                 containsString(
@@ -89,8 +88,7 @@ class ZapStopAjaxSpiderToolUnitTest {
     void shouldThrowExceptionWhenScanIdBlank() {
         ToolArguments args = new ToolArguments(Map.of("scan_id", ""), Map.of());
 
-        McpToolException ex =
-                assertThrows(McpToolException.class, () -> tool.execute(args));
+        McpToolException ex = assertThrows(McpToolException.class, () -> tool.execute(args));
         assertThat(
                 ex.getMessage(),
                 containsString(
@@ -103,8 +101,7 @@ class ZapStopAjaxSpiderToolUnitTest {
         given(extAutomation.getLongRunningJobProgress("ajaxspider-1")).willReturn(-1);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ajaxspider-1"), Map.of());
 
-        McpToolException ex =
-                assertThrows(McpToolException.class, () -> tool.execute(args));
+        McpToolException ex = assertThrows(McpToolException.class, () -> tool.execute(args));
         assertThat(
                 ex.getMessage(),
                 containsString(
@@ -131,7 +128,6 @@ class ZapStopAjaxSpiderToolUnitTest {
 
         assertThat(
                 result.text(),
-                containsString(
-                        Constant.messages.getString("mcp.tool.stopajaxspider.success")));
+                containsString(Constant.messages.getString("mcp.tool.stopajaxspider.success")));
     }
 }

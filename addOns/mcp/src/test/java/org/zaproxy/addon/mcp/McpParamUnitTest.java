@@ -26,11 +26,8 @@ import static org.hamcrest.Matchers.matchesRegex;
 import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.nullValue;
 
-import java.util.Locale;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.parosproxy.paros.Constant;
-import org.zaproxy.zap.utils.I18N;
 import org.zaproxy.zap.utils.ZapXmlConfiguration;
 
 /** Unit tests for {@link McpParam}. */
@@ -41,15 +38,17 @@ class McpParamUnitTest {
 
     @BeforeEach
     void setUp() {
-        Constant.messages = new I18N(Locale.ROOT);
         param = new McpParam();
         config = new ZapXmlConfiguration();
         param.load(config);
     }
 
     @Test
-    void shouldUseDefaultPortWhenNotInConfig() {
+    void shouldUseDefaults() {
         assertThat(param.getPort(), is(equalTo(McpParam.DEFAULT_PORT)));
+        assertThat(param.isSecurityKeyEnabled(), is(true));
+        assertThat(param.isRecordInHistory(), is(false));
+        assertThat(param.isSecureOnly(), is(true));
     }
 
     @Test
@@ -65,11 +64,6 @@ class McpParamUnitTest {
         param.setPort(12345);
 
         assertThat(config.getInt("mcp.port", -1), is(equalTo(12345)));
-    }
-
-    @Test
-    void shouldUseDefaultSecurityKeyEnabledWhenNotInConfig() {
-        assertThat(param.isSecurityKeyEnabled(), is(true));
     }
 
     @Test
@@ -146,11 +140,6 @@ class McpParamUnitTest {
     }
 
     @Test
-    void shouldUseDefaultRecordInHistoryWhenNotInConfig() {
-        assertThat(param.isRecordInHistory(), is(false));
-    }
-
-    @Test
     void shouldLoadRecordInHistoryFromConfig() {
         config.setProperty("mcp.recordInHistory", true);
         param.load(config);
@@ -163,11 +152,6 @@ class McpParamUnitTest {
         param.setRecordInHistory(true);
 
         assertThat(config.getBoolean("mcp.recordInHistory", false), is(true));
-    }
-
-    @Test
-    void shouldDefaultSecureOnlyToTrue() {
-        assertThat(param.isSecureOnly(), is(true));
     }
 
     @Test

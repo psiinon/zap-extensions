@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 
+## [15.46.0] - 2026-03-31
+### Added
+- Allow custom browser builders to define preferences
+
 ## [15.45.0] - 2026-03-04
 ### Fixed
 - Close all webdrivers when ZAP exits.
@@ -351,6 +355,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Updated to Selenium 2.45 and moved to release
 
+[15.46.0]: https://github.com/zaproxy/zap-extensions/releases/selenium-v15.46.0
 [15.45.0]: https://github.com/zaproxy/zap-extensions/releases/selenium-v15.45.0
 [15.44.0]: https://github.com/zaproxy/zap-extensions/releases/selenium-v15.44.0
 [15.43.0]: https://github.com/zaproxy/zap-extensions/releases/selenium-v15.43.0

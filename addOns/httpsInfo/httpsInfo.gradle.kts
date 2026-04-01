@@ -7,8 +7,10 @@ zapAddOn {
         author.set("ZAP Dev Team")
         url.set("https://www.zaproxy.org/docs/desktop/addons/https-info/")
         dependencies {
-            javaVersion.set("21")
             addOns {
+                register("commonlib") {
+                    version.set(">= 1.40.0 & < 2.0.0")
+                }
                 register("network") {
                     version.set(">=0.26.0")
                 }
@@ -19,6 +21,7 @@ zapAddOn {
 
 dependencies {
     testImplementation(project(":testutils"))
+    zapAddOn("commonlib")
     zapAddOn("network")
     implementation(libs.httpsinfo.deepviolet)
     implementation(libs.log4j.slf4j)

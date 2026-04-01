@@ -90,8 +90,7 @@ class ScanPoliciesResourceUnitTest {
 
     @Test
     void shouldReturnPolicyNames() {
-        given(policyManager.getAllPolicyNames())
-                .willReturn(List.of("Default Policy", "Light"));
+        given(policyManager.getAllPolicyNames()).willReturn(List.of("Default Policy", "Light"));
 
         String content = resource.readContent();
         JsonNode array = parseJsonArray(content);

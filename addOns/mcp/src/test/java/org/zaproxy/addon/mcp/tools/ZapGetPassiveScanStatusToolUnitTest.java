@@ -81,7 +81,8 @@ class ZapGetPassiveScanStatusToolUnitTest {
         try {
             tool.execute(args);
         } catch (Exception e) {
-            // Extension not installed leads to NullPointerException or McpToolException — acceptable
+            // Extension not installed leads to NullPointerException or McpToolException —
+            // acceptable
         }
     }
 
@@ -114,7 +115,8 @@ class ZapGetPassiveScanStatusToolUnitTest {
 
         McpToolResult result = tool.execute(args);
 
-        // I18N(Locale.ROOT) drops format args for unresolved keys, so we verify a result is returned
+        // I18N(Locale.ROOT) drops format args for unresolved keys, so we verify a result is
+        // returned
         assertThat(result.text(), is(notNullValue()));
     }
 }

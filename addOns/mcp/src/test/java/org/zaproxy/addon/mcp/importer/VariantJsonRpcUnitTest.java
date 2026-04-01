@@ -38,14 +38,14 @@ import org.junit.jupiter.params.provider.MethodSource;
 import org.parosproxy.paros.core.scanner.NameValuePair;
 import org.parosproxy.paros.network.HttpMessage;
 
-/** Unit tests for {@link VariantJsonRpc}. */
+/** Unit tests for {@link VariantMcpJsonRpc}. */
 class VariantJsonRpcUnitTest {
 
-    private VariantJsonRpc variant;
+    private VariantMcpJsonRpc variant;
 
     @BeforeEach
     void setUp() {
-        variant = new VariantJsonRpc();
+        variant = new VariantMcpJsonRpc();
     }
 
     // ---- getTreePath ----
@@ -366,9 +366,7 @@ class VariantJsonRpcUnitTest {
                         "{\"jsonrpc\":\"2.0\",\"id\":5,\"method\":\"tools/call\","
                                 + "\"params\":{\"name\":\"zap_start_spider\","
                                 + "\"arguments\":{\"target\":\"http://example.com\"}}}");
-        assertThat(
-                variant.getLeafName("/", msg),
-                equalTo("POST: zap_start_spider(target)"));
+        assertThat(variant.getLeafName("/", msg), equalTo("POST: zap_start_spider(target)"));
     }
 
     @Test
@@ -400,8 +398,7 @@ class VariantJsonRpcUnitTest {
                 createPostMessage(
                         "{\"jsonrpc\":\"2.0\",\"id\":6,\"method\":\"resources/read\","
                                 + "\"params\":{\"uri\":\"logs://app/errors?limit=100&level=warn\"}}");
-        assertThat(
-                variant.getLeafName("/", msg), equalTo("POST: errors(limit,level)"));
+        assertThat(variant.getLeafName("/", msg), equalTo("POST: errors(limit,level)"));
     }
 
     // ---- helpers ----

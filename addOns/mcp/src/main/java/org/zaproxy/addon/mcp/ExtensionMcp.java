@@ -67,12 +67,7 @@ import org.zaproxy.addon.pscan.ExtensionPassiveScan2;
 import org.zaproxy.addon.reports.ExtensionReports;
 import org.zaproxy.zap.view.ZapMenuItem;
 
-/**
- * The MCP add-on extension. Implements an MCP server in ZAP.
- *
- * <p>{@link ExtensionAdaptor} classes are the main entry point for adding/loading functionalities
- * provided by the add-ons.
- */
+/** The MCP Integration add-on extension. */
 public class ExtensionMcp extends ExtensionAdaptor {
 
     public static final String NAME = "ExtensionMcp";
@@ -92,14 +87,17 @@ public class ExtensionMcp extends ExtensionAdaptor {
     private Server server;
     private ImportMcpServerJob importMcpServerJob;
     private McpConfigJob mcpConfigJob;
-    private final McpParam param = new McpParam();
-    private final McpToolRegistry toolRegistry = new McpToolRegistry();
-    private final McpResourceRegistry resourceRegistry = new McpResourceRegistry();
-    private final McpPromptRegistry promptRegistry = new McpPromptRegistry();
+    private McpParam param;
+    private McpToolRegistry toolRegistry;
+    private McpResourceRegistry resourceRegistry;
+    private McpPromptRegistry promptRegistry;
+
+    private int lastPort = -1;
 
     public ExtensionMcp() {
         super(NAME);
         setI18nPrefix(PREFIX);
+        this.setOrder(800);
     }
 
     @Override
@@ -108,13 +106,19 @@ public class ExtensionMcp extends ExtensionAdaptor {
     }
 
     @Override
-    public void hook(ExtensionHook extensionHook) {
-        super.hook(extensionHook);
+    public void init() {
+        param = new McpParam();
+        toolRegistry = new McpToolRegistry();
+        resourceRegistry = new McpResourceRegistry();
+        promptRegistry = new McpPromptRegistry();
+    }
 
+    @Override
+    public void hook(ExtensionHook extensionHook) {
         extensionHook.addOptionsParamSet(param);
         extensionHook.addOptionsChangedListener(this::optionsChanged);
         System.out.println("SBSB mcp register VariantJsonRpc (ensabled)"); // TODO
-        extensionHook.addVariant(org.zaproxy.addon.mcp.importer.VariantJsonRpc.class);
+        extensionHook.addVariant(org.zaproxy.addon.mcp.importer.VariantMcpJsonRpc.class);
 
         ExtensionAutomation extAutomation =
                 Control.getSingleton().getExtensionLoader().getExtension(ExtensionAutomation.class);
@@ -196,15 +200,16 @@ public class ExtensionMcp extends ExtensionAdaptor {
     }
 
     @Override
-    public void optionsLoaded() {
-        super.optionsLoaded();
-
-        startServer();
+    public void start() {
+        applyServerConfig();
     }
 
     private void optionsChanged(OptionsParam optionsParam) {
-        stopServer();
-        startServer();
+        if (lastPort != param.getPort()) {
+            stopServer();
+            startServer();
+            lastPort = param.getPort();
+        }
     }
 
     public McpParam getMcpParam() {
@@ -213,8 +218,11 @@ public class ExtensionMcp extends ExtensionAdaptor {
 
     /** Stops and restarts the MCP server using the current param values. */
     public void applyServerConfig() {
-        stopServer();
-        startServer();
+        if (lastPort != param.getPort()) {
+            stopServer();
+            startServer();
+            lastPort = param.getPort();
+        }
     }
 
     private void startServer() {
@@ -232,12 +240,12 @@ public class ExtensionMcp extends ExtensionAdaptor {
                                         toolRegistry,
                                         resourceRegistry,
                                         promptRegistry,
-                                        getAddOnVersion()));
+                                        this.getAddOn().getVersion().toString()));
         try {
             int port = server.start(Server.DEFAULT_ADDRESS, param.getPort());
             LOGGER.info("MCP HTTP listener started on {}:{}", Server.DEFAULT_ADDRESS, port);
         } catch (IOException e) {
-            LOGGER.error("Failed to start MCP HTTP listener on port {}", param.getPort(), e);
+            LOGGER.warn("Failed to start MCP HTTP listener on port {}", param.getPort(), e);
             server = null;
         }
     }
@@ -254,8 +262,9 @@ public class ExtensionMcp extends ExtensionAdaptor {
         }
     }
 
-    private String getAddOnVersion() {
-        return this.getAddOn().getVersion().toString();
+    @Override
+    public void stop() {
+        stopServer();
     }
 
     @Override
@@ -271,7 +280,6 @@ public class ExtensionMcp extends ExtensionAdaptor {
                 extAutomation.unregisterAutomationJob(mcpConfigJob);
             }
         }
-        super.unload();
     }
 
     @Override

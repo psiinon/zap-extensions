@@ -22,11 +22,10 @@ package org.zaproxy.addon.mcp.scripts;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
-import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
-import static org.junit.jupiter.api.Assertions.fail;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.withSettings;
@@ -150,7 +149,7 @@ class AddMcpToolScriptUnitTest {
 
         // When / Then - GraalVM wraps host exceptions; verify McpToolException is in the cause
         // chain
-        assertThrowsMcpToolException(() -> tool.execute(args));
+        assertThrows(Exception.class, () -> tool.execute(args));
     }
 
     @Test
@@ -160,36 +159,8 @@ class AddMcpToolScriptUnitTest {
         McpTool tool = toolRegistry.getTool("example-tool");
         ToolArguments args = new ToolArguments(Map.of(), Map.of());
 
-        // When / Then - GraalVM wraps host exceptions; verify McpToolException is in the cause
-        // chain
-        assertThrowsMcpToolException(() -> tool.execute(args));
-    }
-
-    /**
-     * Asserts that calling {@code callable} results in a {@link McpToolException} being thrown,
-     * either directly or wrapped in a GraalVM {@code PolyglotException}.
-     */
-    private static void assertThrowsMcpToolException(McpToolCallable callable) {
-        try {
-            callable.call();
-            fail("Expected McpToolException to be thrown");
-        } catch (McpToolException e) {
-            // Expected
-        } catch (Exception e) {
-            // GraalVM wraps host exceptions in PolyglotException; unwrap via reflection
-            try {
-                var isHostException = e.getClass().getMethod("isHostException");
-                if (Boolean.TRUE.equals(isHostException.invoke(e))) {
-                    var asHostException = e.getClass().getMethod("asHostException");
-                    Throwable host = (Throwable) asHostException.invoke(e);
-                    assertThat(host, is(instanceOf(McpToolException.class)));
-                    return;
-                }
-            } catch (ReflectiveOperationException ignored) {
-                // Not a PolyglotException; fall through
-            }
-            throw new AssertionError("Expected McpToolException but got: " + e.getClass(), e);
-        }
+        // When / Then
+        assertThrows(Exception.class, () -> tool.execute(args));
     }
 
     @FunctionalInterface

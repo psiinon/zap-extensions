@@ -27,7 +27,6 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.withSettings;
 
 import java.util.Locale;
@@ -73,8 +72,7 @@ class ZapGetActiveScanStatusToolUnitTest {
     void shouldThrowExceptionWhenScanIdNull() {
         ToolArguments args = new ToolArguments(Map.of(), Map.of());
 
-        McpToolException ex =
-                assertThrows(McpToolException.class, () -> tool.execute(args));
+        McpToolException ex = assertThrows(McpToolException.class, () -> tool.execute(args));
         assertThat(
                 ex.getMessage(),
                 containsString(
@@ -86,8 +84,7 @@ class ZapGetActiveScanStatusToolUnitTest {
     void shouldThrowExceptionWhenScanIdBlank() {
         ToolArguments args = new ToolArguments(Map.of("scan_id", ""), Map.of());
 
-        McpToolException ex =
-                assertThrows(McpToolException.class, () -> tool.execute(args));
+        McpToolException ex = assertThrows(McpToolException.class, () -> tool.execute(args));
         assertThat(
                 ex.getMessage(),
                 containsString(
@@ -100,8 +97,7 @@ class ZapGetActiveScanStatusToolUnitTest {
         given(extAutomation.getLongRunningJobProgress("ascan-1")).willReturn(-1);
         ToolArguments args = new ToolArguments(Map.of("scan_id", "ascan-1"), Map.of());
 
-        McpToolException ex =
-                assertThrows(McpToolException.class, () -> tool.execute(args));
+        McpToolException ex = assertThrows(McpToolException.class, () -> tool.execute(args));
         assertThat(
                 ex.getMessage(),
                 containsString(
@@ -138,7 +134,8 @@ class ZapGetActiveScanStatusToolUnitTest {
 
         McpToolResult result = tool.execute(args);
 
-        // I18N(Locale.ROOT) drops format args for unresolved keys, so we verify a result is returned
+        // I18N(Locale.ROOT) drops format args for unresolved keys, so we verify a result is
+        // returned
         assertThat(result.text(), is(notNullValue()));
     }
 }

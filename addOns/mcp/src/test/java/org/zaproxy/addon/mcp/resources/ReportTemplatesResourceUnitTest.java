@@ -53,8 +53,7 @@ class ReportTemplatesResourceUnitTest {
         Constant.messages = new I18N(Locale.ROOT);
         extensionLoader =
                 mock(ExtensionLoader.class, withSettings().strictness(Strictness.LENIENT));
-        extReports =
-                mock(ExtensionReports.class, withSettings().strictness(Strictness.LENIENT));
+        extReports = mock(ExtensionReports.class, withSettings().strictness(Strictness.LENIENT));
         given(extensionLoader.getExtension(ExtensionReports.class)).willReturn(extReports);
         Control.initSingletonForTesting(mock(Model.class), extensionLoader);
         resource = new ReportTemplatesResource();

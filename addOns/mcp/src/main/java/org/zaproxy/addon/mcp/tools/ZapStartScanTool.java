@@ -75,9 +75,8 @@ public abstract class ZapStartScanTool implements McpTool {
 
             AutomationJob job = extAutomation.getAutomationJob(getJobName());
             if (job == null) {
-                throw new RuntimeException(
-                        new McpToolException(
-                                Constant.messages.getString(getJobNotAvailableErrorKey())));
+                throw new McpToolException(
+                        Constant.messages.getString(getJobNotAvailableErrorKey()));
             }
             job = job.newJob();
 
@@ -106,11 +105,9 @@ public abstract class ZapStartScanTool implements McpTool {
             } else {
                 context = session.getContext(target);
                 if (context == null) {
-                    throw new RuntimeException(
-                            new McpToolException(
-                                    Constant.messages.getString(
-                                            getMessageKeyPrefix() + ".error.contextnotfound",
-                                            target)));
+                    throw new McpToolException(
+                            Constant.messages.getString(
+                                    getMessageKeyPrefix() + ".error.contextnotfound", target));
                 }
                 plan.getEnv().addContext(context);
             }
@@ -124,11 +121,9 @@ public abstract class ZapStartScanTool implements McpTool {
                 scanId = extAutomation.getScanIdFuture(job).get(10, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                LOGGER.error("Interrupted while starting scan", e);
-                throw new RuntimeException(
-                        new McpToolException(
-                                Constant.messages.getString(
-                                        getMessageKeyPrefix() + ".error.failed")));
+                LOGGER.debug("Interrupted while starting scan", e);
+                throw new McpToolException(
+                        Constant.messages.getString(getMessageKeyPrefix() + ".error.failed"));
             }
         } catch (McpToolException e) {
             LOGGER.warn("Failed to start scan", e);

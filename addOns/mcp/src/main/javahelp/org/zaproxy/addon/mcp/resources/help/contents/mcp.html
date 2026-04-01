@@ -24,7 +24,7 @@ Exposing the MCP server externally is dangerous because:
 </ul>
 
 <p>
-Ensure your firewall or OS network settings block external access to the MCP server port (default: 8282).
+Ensure your firewall or OS network settings block external access to the MCP server port.
 
 <H2>Overview</H2>
 
@@ -37,15 +37,7 @@ The MCP server exposes ZAP functionality through:
 
 <H2>Configuration</H2>
 
-The MCP server is configured via the <a href="mcp-options.html">Options</a> panel, where you can set:
-<ul>
-<li>Whether the MCP server is enabled (default: enabled)
-<li>The port the server listens on (default: 8282)
-<li>Whether to require a security key for authentication
-<li>The security key (when authentication is enabled)
-<li>Whether to reject plain HTTP connections (Secure Only, enabled by default)
-<li>Whether to record MCP server requests in ZAP history (disabled by default)
-</ul>
+The MCP server is configured via the <a href="mcp-options.html">Options</a> panel.
 
 <H2>Automation Framework</H2>
 
@@ -64,8 +56,7 @@ Authorization: &lt;your-security-key&gt;
 
 <H2>Accessing the Server</H2>
 
-The MCP server runs on <code>localhost</code> by default. MCP clients connect to:
-
+The MCP server runs on <code>localhost</code>. MCP clients connect to:
 <pre>
 http://localhost:8282
 </pre>

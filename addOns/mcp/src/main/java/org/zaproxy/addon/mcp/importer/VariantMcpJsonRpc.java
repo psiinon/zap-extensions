@@ -38,12 +38,12 @@ import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.network.HttpRequestHeader;
 
 /**
- * A ZAP {@link Variant} that recognises JSON-RPC 2.0 requests and organises them in the sites tree
- * using the {@code method} field as the path (e.g. {@code tools/call}) with a per-method qualifier
- * as an additional node. It exposes the data values inside {@code params} as fuzzing parameters —
- * skipping the JSON-RPC envelope fields ({@code jsonrpc}, {@code id}, {@code method}) and the
- * method-selector fields ({@code name} for {@code tools/call} / {@code prompts/get}). Nested
- * objects (e.g. {@code arguments}) are flattened one level. String values that contain RFC
+ * A ZAP {@link Variant} that recognises JSON-RPC 2.0 MCP requests and organises them in the sites
+ * tree using the {@code method} field as the path (e.g. {@code tools/call}) with a per-method
+ * qualifier as an additional node. It exposes the data values inside {@code params} as fuzzing
+ * parameters — skipping the JSON-RPC envelope fields ({@code jsonrpc}, {@code id}, {@code method})
+ * and the method-selector fields ({@code name} for {@code tools/call} / {@code prompts/get}).
+ * Nested objects (e.g. {@code arguments}) are flattened one level. String values that contain RFC
  * 6570-style template variables (e.g. {@code {alertRef}}) have each variable exposed as an
  * individual parameter instead of the raw string.
  *
@@ -52,9 +52,9 @@ import org.parosproxy.paros.network.HttpRequestHeader;
  * than the JSON-RPC method. Template variables and query-string parameters within the URI are
  * exposed as fuzz parameters.
  */
-public class VariantJsonRpc implements Variant {
+public class VariantMcpJsonRpc implements Variant {
 
-    private static final Logger LOGGER = LogManager.getLogger(VariantJsonRpc.class);
+    private static final Logger LOGGER = LogManager.getLogger(VariantMcpJsonRpc.class);
     private static final ObjectMapper MAPPER = new ObjectMapper();
     private static final Pattern TEMPLATE_VAR = Pattern.compile("\\{([^}]+)\\}");
 

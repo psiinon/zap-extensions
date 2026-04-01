@@ -125,11 +125,7 @@ public class ZapCreateContextTool implements McpTool {
             }
             session.saveContext(context);
         } catch (Exception e) {
-            Throwable cause = e.getCause();
-            if (cause instanceof McpToolException mte) {
-                throw mte;
-            }
-            LOGGER.error("Failed to create context", e);
+            LOGGER.warn("Failed to create context", e);
             throw new McpToolException(
                     Constant.messages.getString("mcp.tool.createcontext.error.failed"));
         }

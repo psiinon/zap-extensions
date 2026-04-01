@@ -207,7 +207,6 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
         extensionHook.addOptionsParamSet(getClientParam());
         extensionHook.addApiImplementor(this.api);
         extensionHook.addApiImplementor(new ClientSpiderApi(this));
-        extensionHook.addSessionListener(new SessionChangeListener());
 
         if (hasView()) {
             extensionHook.getHookView().addSelectPanel(getClientMapPanel());
@@ -668,41 +667,6 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
         return Collections.unmodifiableList(authHandlers);
     }
 
-    private class SessionChangeListener implements SessionChangedListener {
-
-        @Override
-        public void sessionChanged(Session session) {
-            if (clientMapPanel != null) {
-                clientMapPanel.clear();
-            }
-            if (clientDetailsPanel != null) {
-                clientDetailsPanel.clear();
-            }
-            if (clientHistoryTableModel != null) {
-                clientHistoryTableModel.clear();
-            }
-            spiderScanController.reset();
-            if (hasView()) {
-                pscanStatus.setScanCount(0);
-            }
-        }
-
-        @Override
-        public void sessionAboutToChange(Session session) {
-            spiderScanController.stopAllScans();
-        }
-
-        @Override
-        public void sessionScopeChanged(Session session) {
-            // Ignore
-        }
-
-        @Override
-        public void sessionModeChanged(Mode mode) {
-            // Ignore
-        }
-    }
-
     void addZestStatement(String stmt) throws Exception {
         LOGGER.debug("Got zest statement: {}", stmt);
         if (clientHandler == null) {
@@ -739,11 +703,7 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
 
     private void initScanDialog() {
         if (spiderDialog == null) {
-            spiderDialog =
-                    new ClientSpiderDialog(
-                            this,
-                            View.getSingleton().getMainFrame(),
-                            DisplayUtils.getScaledDimension(700, 300));
+            spiderDialog = new ClientSpiderDialog(this, View.getSingleton().getMainFrame());
         }
         spiderDialog.updateBrowsers();
     }
@@ -876,6 +836,7 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
 
         @Override
         public void sessionAboutToChange(Session session) {
+            spiderScanController.stopAllScans();
             spiderScanController.reset();
 
             if (hasView()) {
@@ -888,8 +849,20 @@ public class ExtensionClientIntegration extends ExtensionAdaptor {
 
         @Override
         public void sessionChanged(final Session session) {
+            if (clientMapPanel != null) {
+                clientMapPanel.clear();
+            }
+            if (clientDetailsPanel != null) {
+                clientDetailsPanel.clear();
+            }
+            if (clientHistoryTableModel != null) {
+                clientHistoryTableModel.clear();
+            }
+            spiderScanController.reset();
+
             if (hasView()) {
                 ThreadUtils.invokeAndWaitHandled(getClientSpiderPanel()::reset);
+                pscanStatus.setScanCount(0);
             }
         }
 
