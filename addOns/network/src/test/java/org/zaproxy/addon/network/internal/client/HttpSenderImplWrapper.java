@@ -165,4 +165,8 @@ public class HttpSenderImplWrapper<T extends HttpSenderContext> {
             throws IOException {
         impl.sendAndReceive(ctx, requestConfig, message, null);
     }
+
+    public void sendAndReceiveCapturingEventStream(HttpMessage msg) throws IOException {
+        impl.sendAndReceiveCapturingEventStream(parent, null, msg);
+    }
 }

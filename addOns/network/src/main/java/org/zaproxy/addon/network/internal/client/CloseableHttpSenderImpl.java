@@ -19,7 +19,11 @@
  */
 package org.zaproxy.addon.network.internal.client;
 
+import java.io.IOException;
+import org.parosproxy.paros.network.HttpMessage;
+import org.parosproxy.paros.network.HttpSender;
 import org.zaproxy.addon.network.internal.ratelimit.RateLimiter;
+import org.zaproxy.zap.network.HttpRequestConfig;
 import org.zaproxy.zap.network.HttpSenderContext;
 import org.zaproxy.zap.network.HttpSenderImpl;
 
@@ -34,4 +38,14 @@ public interface CloseableHttpSenderImpl<T extends HttpSenderContext> extends Ht
     void close();
 
     default void setRateLimiter(RateLimiter rateLimiter) {}
+
+    /**
+     * Sends the request and reads the response body even when the response is an event stream.
+     * Defaults to {@link UnsupportedOperationException}; concrete senders override.
+     */
+    default void sendAndReceiveCapturingEventStream(
+            HttpSender parent, HttpRequestConfig config, HttpMessage msg) throws IOException {
+        throw new UnsupportedOperationException(
+                "Event-stream capture is not supported by this sender implementation.");
+    }
 }

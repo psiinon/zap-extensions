@@ -312,6 +312,11 @@ public class HttpSenderApache
     }
 
     @Override
+    protected void prepareEventStreamCapture(ZapHttpClientContext requestCtx) {
+        requestCtx.setAttribute(ZapHttpRequestExecutor.CAPTURE_EVENT_STREAM, Boolean.TRUE);
+    }
+
+    @Override
     protected byte[] getBytes(HttpEntity body) throws IOException {
         if (body == null) {
             return null;
@@ -525,7 +530,11 @@ public class HttpSenderApache
 
         updateRequestHeaders(message.getRequestHeader(), requestCtx.getRequest());
 
-        if (isSet(requestCtx, RemoveTransferEncoding.ATTR_NAME) && !message.isEventStream()) {
+        boolean capturedEventStream =
+                Boolean.TRUE.equals(
+                        requestCtx.getAttribute(ZapHttpRequestExecutor.CAPTURE_EVENT_STREAM));
+        if (isSet(requestCtx, RemoveTransferEncoding.ATTR_NAME)
+                && (!message.isEventStream() || capturedEventStream)) {
             message.getResponseHeader().setContentLength(message.getResponseBody().length());
         }
 

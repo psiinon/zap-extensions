@@ -1119,6 +1119,133 @@ class HttpSenderImplUnitTest {
         }
     }
 
+    @Nested
+    @Timeout(60)
+    class EventStreamCapture {
+
+        private final String SSE_BODY =
+                "event: message\n"
+                        + "id: 1\n"
+                        + "data: {\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}\n\n";
+
+        @BeforeEach
+        void setUp() {
+            server.setHttpMessageHandler(
+                    (ctx, msg) -> {
+                        msg.setResponseHeader(
+                                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\n\r\n");
+                        msg.setResponseBody(SSE_BODY);
+                        msg.getResponseHeader()
+                                .setContentLength(msg.getResponseBody().length());
+                    });
+        }
+
+        @Test
+        void shouldCaptureSseBodyOnNewPath() throws Exception {
+            // When
+            httpSender.sendAndReceiveCapturingEventStream(message);
+            // Then
+            assertThat(message.getResponseBody().toString(), is(equalTo(SSE_BODY)));
+            assertThat(
+                    message.getResponseHeader().getContentLength(),
+                    is(equalTo(SSE_BODY.length())));
+            assertThat(
+                    message.getResponseHeader().getHeader("Content-Type"),
+                    containsString("text/event-stream"));
+        }
+
+        @Test
+        void shouldStillDiscardSseBodyOnDefaultPath() throws Exception {
+            // When
+            httpSender.sendAndReceive(message);
+            // Then - existing contract preserved: default sendAndReceive zero-lengths SSE bodies.
+            assertThat(message.getResponseBody().toString(), is(equalTo("")));
+        }
+
+        @Test
+        void shouldNotifyListenersOnNewPath() throws Exception {
+            // Given
+            HttpSenderListener listener = mock(HttpSenderListener.class);
+            httpSender.addListener(listener);
+            // When
+            httpSender.sendAndReceiveCapturingEventStream(message);
+            // Then
+            verify(listener).onHttpRequestSend(message, INITIATOR, httpSender.getParent());
+            verify(listener).onHttpResponseReceive(message, INITIATOR, httpSender.getParent());
+        }
+
+        @Test
+        void shouldCaptureChunkedSseBodyAndFixUpContentLength() throws Exception {
+            // Given — a chunked SSE response (real-world Streamable HTTP servers do this).
+            server.setHttpMessageHandler(
+                    (ctx, msg) -> {
+                        msg.setResponseHeader(
+                                "HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nContent-Type: text/event-stream\r\n\r\n");
+                        msg.setResponseBody(
+                                Integer.toHexString(SSE_BODY.length())
+                                        + "\r\n"
+                                        + SSE_BODY
+                                        + "\r\n0\r\n\r\n");
+                    });
+            // When
+            httpSender.sendAndReceiveCapturingEventStream(message);
+            // Then — body captured, Transfer-Encoding stripped, Content-Length reflects the body.
+            assertThat(message.getResponseBody().toString(), is(equalTo(SSE_BODY)));
+            assertThat(
+                    message.getResponseHeader().getHeader("Transfer-Encoding"),
+                    is(nullValue()));
+            assertThat(
+                    message.getResponseHeader().getContentLength(),
+                    is(equalTo(SSE_BODY.length())));
+        }
+
+        @Test
+        void shouldBehaveLikeSendAndReceiveForNonSseResponse() throws Exception {
+            // Given — the capture path must be a safe drop-in even when the response is plain JSON.
+            String jsonBody = "{\"jsonrpc\":\"2.0\",\"id\":1,\"result\":{\"ok\":true}}";
+            server.setHttpMessageHandler(
+                    (ctx, msg) -> {
+                        msg.setResponseHeader(
+                                "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n");
+                        msg.setResponseBody(jsonBody);
+                        msg.getResponseHeader()
+                                .setContentLength(msg.getResponseBody().length());
+                    });
+            // When
+            httpSender.sendAndReceiveCapturingEventStream(message);
+            // Then
+            assertThat(message.getResponseBody().toString(), is(equalTo(jsonBody)));
+            assertThat(
+                    message.getResponseHeader().getHeader("Content-Type"),
+                    containsString("application/json"));
+        }
+
+        @Test
+        void shouldPreserveCustomResponseHeadersOnNewPath() throws Exception {
+            // Given — real MCP servers set session and auth headers we must not strip.
+            String sessionId = "9071a8e1-92d1-4350-a47d-b8f7c1f22dc5";
+            server.setHttpMessageHandler(
+                    (ctx, msg) -> {
+                        msg.setResponseHeader(
+                                "HTTP/1.1 200 OK\r\nContent-Type: text/event-stream\r\nMcp-Session-Id: "
+                                        + sessionId
+                                        + "\r\nX-Custom-Header: keep-me\r\n\r\n");
+                        msg.setResponseBody(SSE_BODY);
+                        msg.getResponseHeader()
+                                .setContentLength(msg.getResponseBody().length());
+                    });
+            // When
+            httpSender.sendAndReceiveCapturingEventStream(message);
+            // Then
+            assertThat(
+                    message.getResponseHeader().getHeader("Mcp-Session-Id"),
+                    is(equalTo(sessionId)));
+            assertThat(
+                    message.getResponseHeader().getHeader("X-Custom-Header"),
+                    is(equalTo("keep-me")));
+        }
+    }
+
     static Stream<SenderMethod> sendAndReceiveMethodsWithRedirections() {
         return Stream.of(
                 (httpSender, httpMessage) -> {

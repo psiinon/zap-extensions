@@ -55,6 +55,13 @@ public class ZapHttpRequestExecutor extends HttpRequestExecutor {
     public static final String EXEC_RUNTIME = "zap.exec.runtime";
     public static final String CONNECTION_STREAM = "zap.connection.stream";
 
+    /**
+     * When set on the request context to {@link Boolean#TRUE}, this executor reads an event-stream
+     * response body inline instead of detaching the socket for streaming. Callers that need a
+     * single, finite SSE response (e.g. MCP Streamable HTTP) opt in via this flag.
+     */
+    public static final String CAPTURE_EVENT_STREAM = "zap.capture.eventstream";
+
     public ZapHttpRequestExecutor() {
         super(DEFAULT_WAIT_FOR_CONTINUE, null, null);
     }
@@ -89,8 +96,10 @@ public class ZapHttpRequestExecutor extends HttpRequestExecutor {
                     }
                 }
             }
+            boolean captureEventStream =
+                    Boolean.TRUE.equals(context.getAttribute(CAPTURE_EVENT_STREAM));
             if (response.getCode() == HttpStatus.SC_SWITCHING_PROTOCOLS
-                    || isEventStream(response)) {
+                    || (isEventStream(response) && !captureEventStream)) {
                 if (conn instanceof ManagedHttpClientConnection) {
                     HttpClientContext clientContext = HttpClientContext.adapt(context);
                     clientContext.setUserToken(CONNECTION_STREAM);

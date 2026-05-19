@@ -346,6 +346,28 @@ public class ExtensionNetwork extends ExtensionAdaptor implements CommandLineLis
         return getConnectionOptions().isHttpProxyEnabled();
     }
 
+    /**
+     * Sends the given request through the supplied {@link HttpSender} and captures the response
+     * body even when the response is a finite event stream ({@code Content-Type:
+     * text/event-stream}). The default {@code HttpSender.sendAndReceive} discards SSE bodies so
+     * that the proxy can stream them live; use this when you need to consume a single, short-lived
+     * SSE response (e.g. an MCP Streamable HTTP reply that wraps the JSON-RPC payload in an SSE
+     * frame).
+     *
+     * <p>The provided {@code sender} is used for connection settings (upstream proxy, TLS, auth,
+     * listeners). The {@link HttpMessage} is populated with response headers and body as if {@code
+     * sendAndReceive} had been called.
+     *
+     * @since 0.18.0
+     */
+    public void sendAndReceiveCapturingEventStream(HttpSender sender, HttpMessage msg)
+            throws IOException {
+        if (httpSenderNetwork == null) {
+            throw new IOException("Network sender is not initialised.");
+        }
+        httpSenderNetwork.sendAndReceiveCapturingEventStream(sender, null, msg);
+    }
+
     ClientCertificatesOptions getClientCertificatesOptions() {
         return clientCertificatesOptions;
     }

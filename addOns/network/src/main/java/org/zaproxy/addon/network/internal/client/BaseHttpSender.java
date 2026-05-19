@@ -221,6 +221,18 @@ public abstract class BaseHttpSender<T1 extends BaseHttpSenderContext, T2, T3>
                 msg.setResponseBody(bodyContent == null ? EMPTY_BODY : bodyContent);
             };
 
+    /**
+     * Body consumer used by {@link #sendAndReceiveCapturingEventStream}. Unlike {@link
+     * #defaultBodyConsumer} it reads the body bytes even when the response is an event stream, so
+     * callers that need a single short-lived SSE response (e.g. MCP Streamable HTTP) can parse the
+     * payload.
+     */
+    private final ResponseBodyConsumer<T3> capturingBodyConsumer =
+            (msg, entity) -> {
+                byte[] bodyContent = getBytes(entity);
+                msg.setResponseBody(bodyContent == null ? EMPTY_BODY : bodyContent);
+            };
+
     protected abstract InputStream getStream(T3 body) throws IOException;
 
     protected abstract byte[] getBytes(T3 body) throws IOException;
@@ -277,6 +289,37 @@ public abstract class BaseHttpSender<T1 extends BaseHttpSenderContext, T2, T3>
 
         send(ctx, requestCtx, effectiveConfig, msg, bodyConsumer);
     }
+
+    /**
+     * Sends the request and reads the response body even when the response is an event stream
+     * ({@code Content-Type: text/event-stream}). Callers that need a single, short-lived SSE
+     * response should use this instead of {@link #sendAndReceive(HttpSender, HttpRequestConfig,
+     * HttpMessage, java.nio.file.Path)}, which deliberately discards SSE bodies so the proxy can
+     * stream them live.
+     */
+    @Override
+    public void sendAndReceiveCapturingEventStream(
+            HttpSender parent, HttpRequestConfig config, HttpMessage msg) throws IOException {
+        sendAndReceiveCapturingEventStream(getContext(parent), config, msg);
+    }
+
+    /**
+     * Variant of {@link #sendAndReceiveCapturingEventStream(HttpSender, HttpRequestConfig,
+     * HttpMessage)} that takes the sender context directly.
+     */
+    public void sendAndReceiveCapturingEventStream(
+            T1 ctx, HttpRequestConfig config, HttpMessage msg) throws IOException {
+        HttpRequestConfig effectiveConfig = getEffectiveConfig(ctx, config);
+        T2 requestCtx = createRequestContext(ctx, effectiveConfig);
+        prepareEventStreamCapture(requestCtx);
+        send(ctx, requestCtx, effectiveConfig, msg, capturingBodyConsumer);
+    }
+
+    /**
+     * Hook for subclasses to opt the per-request transport context into reading event-stream
+     * bodies inline rather than handing the stream off to the proxy. The default does nothing.
+     */
+    protected void prepareEventStreamCapture(T2 requestCtx) {}
 
     private HttpRequestConfig getEffectiveConfig(T1 ctx, HttpRequestConfig config) {
         if (config != null) {
