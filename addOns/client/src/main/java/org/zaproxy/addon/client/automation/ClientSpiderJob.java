@@ -54,6 +54,8 @@ public class ClientSpiderJob extends AutomationJob {
     private Data data;
     private Parameters parameters = new Parameters();
     private boolean forceStop;
+    private volatile Integer scanId;
+    private volatile ClientSpider currentSpider;
 
     public ClientSpiderJob() {
         this.data = new Data(this, parameters);
@@ -107,7 +109,7 @@ public class ClientSpiderJob extends AutomationJob {
         uriStr = env.replaceVars(uriStr);
 
         forceStop = false;
-        int scanId = -1;
+        scanId = null;
         try {
             scanId =
                     getExtClient()
@@ -126,38 +128,62 @@ public class ClientSpiderJob extends AutomationJob {
             return;
         }
         ClientSpider spider = getExtClient().getScan(scanId);
+        try {
+            currentSpider = spider;
 
-        long endTime = Long.MAX_VALUE;
-        if (JobUtils.unBox(this.getParameters().getMaxDuration()) > 0) {
-            // The spider should stop, if it doesnt we will stop it (after a few seconds leeway)
-            endTime =
-                    System.currentTimeMillis()
-                            + TimeUnit.MINUTES.toMillis(this.getParameters().getMaxDuration())
-                            + TimeUnit.SECONDS.toMillis(5);
-        }
-
-        // Wait for the client spider to finish
-
-        while (true) {
-            this.sleep(500);
-
-            if (!spider.isRunning() || forceStop) {
-                break;
+            long endTime = Long.MAX_VALUE;
+            if (JobUtils.unBox(this.getParameters().getMaxDuration()) > 0) {
+                // The spider should stop, if it doesnt we will stop it (after a few seconds leeway)
+                endTime =
+                        System.currentTimeMillis()
+                                + TimeUnit.MINUTES.toMillis(this.getParameters().getMaxDuration())
+                                + TimeUnit.SECONDS.toMillis(5);
             }
-            if (!this.runMonitorTests(progress) || System.currentTimeMillis() > endTime) {
-                forceStop = true;
-                break;
+
+            // Wait for the client spider to finish
+
+            while (true) {
+                this.sleep(500);
+
+                if (!spider.isRunning() || forceStop) {
+                    break;
+                }
+                if (!this.runMonitorTests(progress) || System.currentTimeMillis() > endTime) {
+                    forceStop = true;
+                    break;
+                }
             }
-        }
-        if (forceStop) {
-            spider.stopScan();
-            progress.info(Constant.messages.getString("automation.info.jobstopped", getType()));
+            if (forceStop) {
+                spider.stopScan();
+                progress.info(Constant.messages.getString("automation.info.jobstopped", getType()));
+            }
+        } finally {
+            currentSpider = null;
         }
     }
 
     @Override
     public void stop() {
         forceStop = true;
+    }
+
+    @Override
+    public boolean isLongRunningJob() {
+        return true;
+    }
+
+    @Override
+    public String getLongRunningJobId() {
+        return scanId != null ? "clientspider-" + scanId : null;
+    }
+
+    @Override
+    public int getLongRunningJobProgress() {
+        ClientSpider spider = currentSpider;
+        if (spider != null) {
+            return spider.isStopped() ? 100 : Math.min(spider.getProgress(), 99);
+        }
+        return getStatus() == Status.COMPLETED ? 100 : 0;
     }
 
     protected ClientSpiderOptions paramsToOptions() {

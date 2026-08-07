@@ -4,7 +4,14 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
+### Added
+- `zap_send_request` tool to send HTTP requests through ZAP (with optional context user authentication) and return the full response.
+- `zap_start_client_spider`, `zap_stop_client_spider`, and `zap_get_client_spider_status` tools (requires the Client Side Integration add-on).
+- `max_duration`, `max_crawl_depth`, and `max_children` parameters to `zap_start_spider`.
+- `zap_generate_report` now returns the report inline as a zipped embedded resource when `file_path` is not specified, which is now optional.
 
+### Fixed
+- MCP requests recorded in the ZAP History (via the "Record MCP requests in ZAP history" option) to have the correct timestamp instead of the epoch.
 
 ## [0.3.0] - 2026-08-07
 

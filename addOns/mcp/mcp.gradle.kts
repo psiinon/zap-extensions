@@ -27,6 +27,9 @@ zapAddOn {
                 register("automation") {
                     version.set(">=0.59.0")
                 }
+                register("client") {
+                    version.set(">=0.31.0")
+                }
                 register("commonlib") {
                     version.set(">=1.17.0")
                 }
@@ -46,6 +49,7 @@ zapAddOn {
 
 dependencies {
     zapAddOn("automation")
+    zapAddOn("client")
     zapAddOn("commonlib")
     zapAddOn("network")
     zapAddOn("pscan")

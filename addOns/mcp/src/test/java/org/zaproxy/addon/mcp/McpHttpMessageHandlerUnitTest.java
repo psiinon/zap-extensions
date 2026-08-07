@@ -22,6 +22,7 @@ package org.zaproxy.addon.mcp;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThan;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 
@@ -200,6 +201,16 @@ class McpHttpMessageHandlerUnitTest {
         handler.handleMessage(ctx, msg);
 
         assertThat(msg.getResponseHeader().getStatusCode(), equalTo(HttpStatusCode.OK));
+    }
+
+    @Test
+    void shouldStampTimeSentOnHandledRequest() throws Exception {
+        param.setSecurityKeyEnabled(false);
+        assertThat(msg.getTimeSentMillis(), equalTo(0L));
+
+        handler.handleMessage(ctx, msg);
+
+        assertThat(msg.getTimeSentMillis(), greaterThan(0L));
     }
 
     @Test

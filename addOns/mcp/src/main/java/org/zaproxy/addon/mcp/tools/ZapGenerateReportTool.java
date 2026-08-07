@@ -19,11 +19,18 @@
  */
 package org.zaproxy.addon.mcp.tools;
 
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -32,6 +39,7 @@ import org.zaproxy.addon.mcp.McpTool;
 import org.zaproxy.addon.mcp.McpToolException;
 import org.zaproxy.addon.mcp.McpToolResult;
 import org.zaproxy.addon.reports.ExtensionReports;
+import org.zaproxy.addon.reports.Template;
 
 /** MCP tool that generates a ZAP report. */
 public class ZapGenerateReportTool implements McpTool {
@@ -63,20 +71,13 @@ public class ZapGenerateReportTool implements McpTool {
                 "title",
                 InputSchema.PropertyDef.ofString(
                         Constant.messages.getString("mcp.tool.generatereport.param.title")));
-        return new InputSchema(properties, List.of("file_path", "template"));
+        return new InputSchema(properties, List.of("template"));
     }
 
     @Override
     public McpToolResult execute(ToolArguments arguments) throws McpToolException {
         ExtensionReports extReports =
                 Control.getSingleton().getExtensionLoader().getExtension(ExtensionReports.class);
-
-        String filePath = arguments.getString("file_path");
-        if (filePath == null || filePath.isBlank()) {
-            throw new McpToolException(
-                    Constant.messages.getString("mcp.tool.generatereport.error.missingfilepath"));
-        }
-        filePath = filePath.trim();
 
         String template = arguments.getString("template");
         if (template == null || template.isBlank()) {
@@ -86,12 +87,18 @@ public class ZapGenerateReportTool implements McpTool {
         template = template.trim();
 
         String title = arguments.getString("title");
-        if (title == null) {
-            title = "";
-        } else {
-            title = title.trim();
-        }
+        title = title == null ? "" : title.trim();
 
+        String filePath = McpToolUtils.optionalTrim(arguments.getString("file_path"));
+        if (filePath != null) {
+            return generateToFile(extReports, template, title, filePath);
+        }
+        return generateAsZip(extReports, template, title);
+    }
+
+    private McpToolResult generateToFile(
+            ExtensionReports extReports, String template, String title, String filePath)
+            throws McpToolException {
         try {
             File report = extReports.generateReport(template, filePath, title, "", false);
             return McpToolResult.success(
@@ -112,6 +119,81 @@ public class ZapGenerateReportTool implements McpTool {
                     Constant.messages.getString(
                             "mcp.tool.generatereport.error.failed",
                             Constant.messages.getString("mcp.tool.error.unknown")));
+        }
+    }
+
+    /**
+     * Generates the report to a temporary directory and returns the whole thing (report file plus
+     * any accompanying resources, e.g. CSS/images) zipped up as an embedded resource, since there
+     * is nowhere on disk that would be meaningful to a remote MCP client.
+     */
+    private McpToolResult generateAsZip(ExtensionReports extReports, String template, String title)
+            throws McpToolException {
+        Template reportTemplate = extReports.getTemplateByConfigName(template);
+        if (reportTemplate == null) {
+            throw new McpToolException(
+                    Constant.messages.getString(
+                            "mcp.tool.generatereport.error.unknowntemplate", template));
+        }
+
+        Path tempDir = null;
+        try {
+            tempDir = Files.createTempDirectory("zap-report-");
+            Path reportFile = tempDir.resolve("report." + reportTemplate.getExtension());
+
+            extReports.generateReport(template, reportFile.toString(), title, "", false);
+
+            byte[] zipBytes = zipDirectory(tempDir);
+            return McpToolResult.successWithBlob(
+                    Constant.messages.getString("mcp.tool.generatereport.success.zip"),
+                    "zap-report:///" + template + ".zip",
+                    "application/zip",
+                    zipBytes);
+        } catch (IOException e) {
+            throw new McpToolException(
+                    Constant.messages.getString(
+                            "mcp.tool.generatereport.error.failed", e.getMessage()));
+        } catch (Exception e) {
+            LOGGER.error("Failed to generate report", e);
+            throw new McpToolException(
+                    Constant.messages.getString(
+                            "mcp.tool.generatereport.error.failed",
+                            Constant.messages.getString("mcp.tool.error.unknown")));
+        } finally {
+            deleteRecursively(tempDir);
+        }
+    }
+
+    private static byte[] zipDirectory(Path dir) throws IOException {
+        ByteArrayOutputStream byteStream = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(byteStream);
+                Stream<Path> paths = Files.walk(dir)) {
+            for (Path path : (Iterable<Path>) paths.filter(Files::isRegularFile)::iterator) {
+                String entryName = dir.relativize(path).toString().replace(File.separatorChar, '/');
+                zip.putNextEntry(new ZipEntry(entryName));
+                Files.copy(path, zip);
+                zip.closeEntry();
+            }
+        }
+        return byteStream.toByteArray();
+    }
+
+    private static void deleteRecursively(Path dir) {
+        if (dir == null) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(dir)) {
+            paths.sorted(Comparator.reverseOrder())
+                    .forEach(
+                            path -> {
+                                try {
+                                    Files.deleteIfExists(path);
+                                } catch (IOException e) {
+                                    LOGGER.debug("Failed to delete {}", path, e);
+                                }
+                            });
+        } catch (IOException e) {
+            LOGGER.debug("Failed to clean up temp report directory {}", dir, e);
         }
     }
 }

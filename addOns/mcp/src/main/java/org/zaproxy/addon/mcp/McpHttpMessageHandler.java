@@ -62,6 +62,7 @@ class McpHttpMessageHandler implements HttpMessageHandler {
             return;
         }
         ctx.overridden();
+        msg.setTimeSentMillis(System.currentTimeMillis());
 
         try {
             String method = msg.getRequestHeader().getMethod();

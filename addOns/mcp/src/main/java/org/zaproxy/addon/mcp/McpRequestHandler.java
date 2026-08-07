@@ -23,6 +23,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
 import org.apache.logging.log4j.LogManager;
@@ -206,6 +207,18 @@ class McpRequestHandler {
         textContent.put("type", "text");
         textContent.put("text", toolResult.text());
         contentArray.add(textContent);
+
+        if (toolResult.resourceBlob() != null) {
+            ObjectNode resourceContent = OBJECT_MAPPER.createObjectNode();
+            resourceContent.put("type", "resource");
+            ObjectNode resourceNode = resourceContent.putObject("resource");
+            resourceNode.put("uri", toolResult.resourceUri());
+            if (toolResult.resourceMimeType() != null) {
+                resourceNode.put("mimeType", toolResult.resourceMimeType());
+            }
+            resourceNode.put("blob", Base64.getEncoder().encodeToString(toolResult.resourceBlob()));
+            contentArray.add(resourceContent);
+        }
 
         ObjectNode result = OBJECT_MAPPER.createObjectNode();
         result.set("content", contentArray);

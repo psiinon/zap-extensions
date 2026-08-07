@@ -24,8 +24,16 @@ package org.zaproxy.addon.mcp;
  *
  * @param text the text content to return to the client
  * @param isError whether the result indicates an error (e.g. tool execution failure)
+ * @param resourceUri the URI of the embedded resource, or {@code null} if there is none
+ * @param resourceMimeType the MIME type of the embedded resource, or {@code null}
+ * @param resourceBlob the raw bytes of the embedded resource, or {@code null} if there is none
  */
-public record McpToolResult(String text, boolean isError) {
+public record McpToolResult(
+        String text,
+        boolean isError,
+        String resourceUri,
+        String resourceMimeType,
+        byte[] resourceBlob) {
 
     /**
      * Creates a successful result with the given text.
@@ -34,7 +42,22 @@ public record McpToolResult(String text, boolean isError) {
      * @return a successful result
      */
     public static McpToolResult success(String text) {
-        return new McpToolResult(text, false);
+        return new McpToolResult(text, false, null, null, null);
+    }
+
+    /**
+     * Creates a successful result with the given text and an embedded binary resource, e.g. a
+     * generated file returned inline instead of being written to disk.
+     *
+     * @param text the result text
+     * @param resourceUri a URI identifying the resource (does not need to be dereferenceable)
+     * @param resourceMimeType the MIME type of the resource
+     * @param resourceBlob the raw bytes of the resource
+     * @return a successful result
+     */
+    public static McpToolResult successWithBlob(
+            String text, String resourceUri, String resourceMimeType, byte[] resourceBlob) {
+        return new McpToolResult(text, false, resourceUri, resourceMimeType, resourceBlob);
     }
 
     /**
@@ -44,6 +67,6 @@ public record McpToolResult(String text, boolean isError) {
      * @return an error result
      */
     public static McpToolResult error(String message) {
-        return new McpToolResult(message, true);
+        return new McpToolResult(message, true, null, null, null);
     }
 }

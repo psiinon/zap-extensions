@@ -19,12 +19,12 @@
  */
 package org.zaproxy.addon.mcp.tools;
 
-import java.net.URI;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import org.apache.commons.httpclient.URI;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.Constant;
@@ -86,13 +86,20 @@ public abstract class ZapStartScanTool implements McpTool {
             Context context;
 
             if (isUrl(target)) {
+                URI uri;
                 try {
-                    new URI(target);
+                    uri = new URI(target, true);
                 } catch (Exception e) {
                     throw new McpToolException(
                             Constant.messages.getString(
                                     getMessageKeyPrefix() + ".error.invalidurl", target),
                             e);
+                }
+                if (!McpToolUtils.isValidForCurrentMode(uri)) {
+                    throw new McpToolException(
+                            Constant.messages.getString(
+                                    "mcp.tool.error.mode",
+                                    Control.getSingleton().getMode().name()));
                 }
                 String contextName = urlToContextName(target);
                 Context existing = session.getContext(contextName);
@@ -199,6 +206,8 @@ public abstract class ZapStartScanTool implements McpTool {
      *
      * @param job the automation job
      * @param arguments the tool arguments
+     * @throws McpToolException if the job cannot be configured from the arguments
      */
-    protected void configureJob(AutomationJob job, ToolArguments arguments) {}
+    protected void configureJob(AutomationJob job, ToolArguments arguments)
+            throws McpToolException {}
 }

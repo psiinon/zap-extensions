@@ -297,5 +297,8 @@ public class ClientSpiderJobUnitTest extends TestUtils {
         assertThat(job.getOrder(), is(equalTo(Order.LAST_EXPLORE)));
         assertThat(job.getParamMethodObject(), is(nullValue()));
         assertThat(job.getParamMethodName(), is(nullValue()));
+        assertThat(job.isLongRunningJob(), is(equalTo(true)));
+        assertThat(job.getLongRunningJobId(), is(nullValue()));
+        assertThat(job.getLongRunningJobProgress(), is(equalTo(0)));
     }
 }

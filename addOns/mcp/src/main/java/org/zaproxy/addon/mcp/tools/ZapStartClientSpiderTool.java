@@ -27,48 +27,55 @@ import org.zaproxy.addon.automation.AutomationProgress;
 import org.zaproxy.addon.automation.jobs.JobUtils;
 import org.zaproxy.addon.mcp.McpToolException;
 
-/** MCP tool that starts the spider via an automation plan. */
-public class ZapStartSpiderTool extends ZapStartScanTool {
+/** MCP tool that starts the Client Spider via an automation plan. */
+public class ZapStartClientSpiderTool extends ZapStartScanTool {
 
     @Override
     public String getName() {
-        return "zap_start_spider";
+        return "zap_start_client_spider";
     }
 
     @Override
     public String getDescription() {
-        return Constant.messages.getString("mcp.tool.startspider.desc");
+        return Constant.messages.getString("mcp.tool.startclientspider.desc");
     }
 
     @Override
     protected String getMessageKeyPrefix() {
-        return "mcp.tool.startspider";
+        return "mcp.tool.startclientspider";
     }
 
     @Override
     protected String getJobName() {
-        return "spider";
+        return "spiderClient";
     }
 
     @Override
     protected String getJobNotAvailableErrorKey() {
-        return "mcp.tool.startspider.error.nospider";
+        return "mcp.tool.startclientspider.error.noclientspider";
     }
 
     @Override
     protected void addSupplementaryProperties(Map<String, InputSchema.PropertyDef> properties) {
         properties.put(
+                "browser_id",
+                InputSchema.PropertyDef.ofString(
+                        Constant.messages.getString("mcp.tool.startclientspider.param.browserid")));
+        properties.put(
                 "max_duration",
                 InputSchema.PropertyDef.ofString(
-                        Constant.messages.getString("mcp.tool.startspider.param.maxduration")));
+                        Constant.messages.getString(
+                                "mcp.tool.startclientspider.param.maxduration")));
         properties.put(
                 "max_crawl_depth",
                 InputSchema.PropertyDef.ofString(
-                        Constant.messages.getString("mcp.tool.startspider.param.maxcrawldepth")));
+                        Constant.messages.getString(
+                                "mcp.tool.startclientspider.param.maxcrawldepth")));
         properties.put(
                 "max_children",
                 InputSchema.PropertyDef.ofString(
-                        Constant.messages.getString("mcp.tool.startspider.param.maxchildren")));
+                        Constant.messages.getString(
+                                "mcp.tool.startclientspider.param.maxchildren")));
     }
 
     @Override
@@ -76,10 +83,21 @@ public class ZapStartSpiderTool extends ZapStartScanTool {
             throws McpToolException {
         Map<String, Object> params = new LinkedHashMap<>();
 
+        String target = McpToolUtils.optionalTrim(arguments.getString("target"));
+        if (target != null
+                && (target.toLowerCase().startsWith("http://")
+                        || target.toLowerCase().startsWith("https://"))) {
+            params.put("url", target);
+        }
+
+        String browserId = McpToolUtils.optionalTrim(arguments.getString("browser_id"));
+        if (browserId != null) {
+            params.put("browserId", browserId);
+        }
         McpToolUtils.putOptionalInt(
                 params, "maxDuration", arguments.getString("max_duration"), "max_duration");
         McpToolUtils.putOptionalInt(
-                params, "maxDepth", arguments.getString("max_crawl_depth"), "max_crawl_depth");
+                params, "maxCrawlDepth", arguments.getString("max_crawl_depth"), "max_crawl_depth");
         McpToolUtils.putOptionalInt(
                 params, "maxChildren", arguments.getString("max_children"), "max_children");
 

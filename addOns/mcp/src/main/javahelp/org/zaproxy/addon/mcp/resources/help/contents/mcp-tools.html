@@ -21,10 +21,15 @@ Create a ZAP context with the given name, URL and optional include/exclude regex
 <p>
 Parameters: <code>name</code>, <code>url</code>, and optionally <code>include_regexes</code>, <code>exclude_regexes</code>
 
-<H2>zap_start_spider</H2>
-Start the spider. The target can be a URL (creates a temporary context) or the name of an existing context. Returns a scan_id for use with zap_stop_spider and zap_get_spider_status.
+<H2>zap_send_request</H2>
+Send an HTTP request through ZAP using the manual request initiator. Optionally send as a configured context user so authentication is applied. Returns JSON with status, timing, headers, bodies, and optional history ID. Respects ZAP Safe/Protect mode.
 <p>
-Parameters: <code>target</code> - a URL or context name
+Parameters: <code>url</code> (required), and optionally <code>method</code> (default GET), <code>headers</code> (array of <code>Name: Value</code>), <code>body</code>, <code>http_version</code>, <code>user</code>, <code>context</code>, <code>follow_redirects</code> (default false), <code>persist</code> (default true)
+
+<H2>zap_start_spider</H2>
+Start the spider. The target can be a URL (creates a temporary context) or the name of an existing context. Returns a scan_id for use with zap_stop_spider and zap_get_spider_status. When the target is a URL, respects ZAP Safe/Protect mode.
+<p>
+Parameters: <code>target</code> - a URL or context name, and optionally <code>max_duration</code> (minutes), <code>max_crawl_depth</code>, <code>max_children</code>
 
 <H2>zap_stop_spider</H2>
 Stop the spider plan if it is running.
@@ -37,7 +42,7 @@ Get the status of the spider plan.
 Parameters: <code>scan_id</code> - the ID returned by zap_start_spider
 
 <H2>zap_start_ajax_spider</H2>
-Start the AJAX spider. The target can be a URL (creates a temporary context) or the name of an existing context. Returns a scan_id for use with zap_stop_ajax_spider and zap_get_ajax_spider_status.
+Start the AJAX spider. The target can be a URL (creates a temporary context) or the name of an existing context. Returns a scan_id for use with zap_stop_ajax_spider and zap_get_ajax_spider_status. When the target is a URL, respects ZAP Safe/Protect mode.
 <p>
 Parameters: <code>target</code> - a URL or context name
 
@@ -51,8 +56,23 @@ Get the status of the AJAX spider plan.
 <p>
 Parameters: <code>scan_id</code> - the ID returned by zap_start_ajax_spider
 
+<H2>zap_start_client_spider</H2>
+Start the Client Spider. The target can be a URL (creates a temporary context) or the name of an existing context. Returns a scan_id for use with zap_stop_client_spider and zap_get_client_spider_status. When the target is a URL, respects ZAP Safe/Protect mode. Requires the Client Side Integration add-on and a working browser (Selenium).
+<p>
+Parameters: <code>target</code> - a URL or context name, and optionally <code>browser_id</code>, <code>max_duration</code> (minutes), <code>max_crawl_depth</code>, <code>max_children</code>
+
+<H2>zap_stop_client_spider</H2>
+Stop the Client Spider plan if it is running.
+<p>
+Parameters: <code>scan_id</code> - the ID returned by zap_start_client_spider
+
+<H2>zap_get_client_spider_status</H2>
+Get the status of the Client Spider plan.
+<p>
+Parameters: <code>scan_id</code> - the ID returned by zap_start_client_spider
+
 <H2>zap_start_active_scan</H2>
-Start the active scan. The target can be a URL (creates a temporary context) or the name of an existing context. Optionally specify a scan policy. The target URL should be in the sites tree (spider first). Returns a scan_id for use with zap_stop_active_scan and zap_get_active_scan_status.
+Start the active scan. The target can be a URL (creates a temporary context) or the name of an existing context. Optionally specify a scan policy. The target URL should be in the sites tree (spider first). Returns a scan_id for use with zap_stop_active_scan and zap_get_active_scan_status. When the target is a URL, respects ZAP Safe/Protect mode.
 <p>
 Parameters: <code>target</code> - a URL or context name, optionally <code>policy</code> - scan policy name (see <code>zap://scan-policies</code>)
 
@@ -84,9 +104,9 @@ Parameters:
 When a body field is included the result also provides <code>*Length</code>, <code>*Offset</code>, <code>*Returned</code>, and <code>*Truncated</code> metadata (e.g. <code>responseBodyTruncated</code>, <code>requestBodyTruncated</code>).
 
 <H2>zap_generate_report</H2>
-Generate a ZAP report. Use the <code>zap://report-templates</code> resource to discover available template names. Requires the reports add-on.
+Generate a ZAP report. Use the <code>zap://report-templates</code> resource to discover available template names. Requires the reports add-on. If <code>file_path</code> is omitted, the report (and any accompanying files, e.g. CSS/images) is returned inline as a zipped embedded resource instead of being written to disk.
 <p>
-Parameters: <code>file_path</code> - full path for the output file (e.g. <code>/tmp/report.html</code>), <code>template</code> - template config name (e.g. <code>traditional-html</code>), optionally <code>title</code> - report title
+Parameters: <code>template</code> - template config name (e.g. <code>traditional-html</code>), optionally <code>file_path</code> - full path for the output file (e.g. <code>/tmp/report.html</code>), <code>title</code> - report title
 
 <H2>zap_list_resources</H2>
 List available ZAP MCP resources (URI, name, description). Useful for clients that only support tools; clients that support the resources capability can use <code>resources/list</code> instead.

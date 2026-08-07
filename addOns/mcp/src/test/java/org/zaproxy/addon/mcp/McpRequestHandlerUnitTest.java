@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.notNullValue;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.Base64;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -111,6 +112,48 @@ class McpRequestHandlerUnitTest {
         JsonNode content = json.get("result").get("content").get(0);
         assertThat(content.get("type").asText(), equalTo("text"));
         assertThat(content.has("text"), equalTo(true));
+    }
+
+    @Test
+    void shouldIncludeResourceContentForBlobResult() {
+        byte[] data = {1, 2, 3, 4};
+        toolRegistry.registerTool(
+                new McpTool() {
+                    @Override
+                    public String getName() {
+                        return "test_blob_tool";
+                    }
+
+                    @Override
+                    public String getDescription() {
+                        return "test";
+                    }
+
+                    @Override
+                    public InputSchema getInputSchema() {
+                        return new InputSchema(Map.of(), List.of());
+                    }
+
+                    @Override
+                    public McpToolResult execute(ToolArguments arguments) {
+                        return McpToolResult.successWithBlob(
+                                "done", "zap-report:///test.zip", "application/zip", data);
+                    }
+                });
+        String request =
+                "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"tools/call\",\"params\":{\"name\":\"test_blob_tool\",\"arguments\":{}}}";
+
+        String response = requestHandler.handleRequest(request);
+
+        JsonNode json = parseJson(response);
+        JsonNode content = json.get("result").get("content");
+        assertThat(content.get(0).get("type").asText(), equalTo("text"));
+        assertThat(content.get(1).get("type").asText(), equalTo("resource"));
+        JsonNode resource = content.get(1).get("resource");
+        assertThat(resource.get("uri").asText(), equalTo("zap-report:///test.zip"));
+        assertThat(resource.get("mimeType").asText(), equalTo("application/zip"));
+        assertThat(
+                resource.get("blob").asText(), equalTo(Base64.getEncoder().encodeToString(data)));
     }
 
     @Test
