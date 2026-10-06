@@ -50,6 +50,15 @@ public abstract class TestPage implements HttpMessageHandler {
         return server;
     }
 
+    /**
+     * Resets any state built up while the page was used (for example tokens that have been issued)
+     * so it is as it was when the page was created, called when ZAP's session changes. Settings are
+     * not state, so are not reset.
+     */
+    public void reset() {
+        // Nothing to reset by default.
+    }
+
     public String getFormParameter(HttpMessage msg, String name) {
         return msg.getFormParams().stream()
                 .filter(p -> p.getName().equals(name))

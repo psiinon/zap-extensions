@@ -40,6 +40,12 @@ public class JsonMultipleCookiesDir extends TestAuthDirectory {
         this.addPage(new JsonMultipleCookiesVerificationPage(server));
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+        tempTokens.clear();
+    }
+
     public String getTempToken(String username) {
         String token = RandomStringUtils.secure().nextAlphanumeric(32);
         tempTokens.put(token, username);

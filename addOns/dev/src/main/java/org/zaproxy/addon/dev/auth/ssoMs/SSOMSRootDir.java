@@ -259,6 +259,12 @@ public class SSOMSRootDir extends TestAuthDirectory {
                 });
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+        tokens.clear();
+    }
+
     private String getToken() {
         String token = RandomStringUtils.secure().nextAlphanumeric(32);
         tokens.add(token);

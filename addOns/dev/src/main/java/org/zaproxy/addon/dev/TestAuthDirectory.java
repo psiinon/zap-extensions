@@ -20,8 +20,8 @@
 package org.zaproxy.addon.dev;
 
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import org.apache.commons.lang3.RandomStringUtils;
 
 /** A test directory which uses authentication. */
@@ -30,7 +30,7 @@ public abstract class TestAuthDirectory extends TestDirectory {
     // These are test credentials, so hardcoding them is fine ;)
     private static final String[][] USERS = {{"test@test.com", "password123"}};
 
-    private Map<String, String> sessions = new HashMap<>();
+    private final Map<String, String> sessions = new ConcurrentHashMap<>();
 
     public TestAuthDirectory(TestProxyServer server, String name) {
         super(server, name);
@@ -41,6 +41,12 @@ public abstract class TestAuthDirectory extends TestDirectory {
                 .filter(c -> (c[0].equals(username) && c[1].equals(password)))
                 .findAny()
                 .isPresent();
+    }
+
+    @Override
+    public void reset() {
+        super.reset();
+        sessions.clear();
     }
 
     public String getToken(String username) {

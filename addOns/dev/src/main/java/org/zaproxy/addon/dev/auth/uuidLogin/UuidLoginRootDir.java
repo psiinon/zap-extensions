@@ -204,6 +204,13 @@ public class UuidLoginRootDir extends TestAuthDirectory {
                 });
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+        tokens.clear();
+        loginPages.clear();
+    }
+
     private String getToken() {
         String token = RandomStringUtils.secure().nextAlphanumeric(32);
         tokens.add(token);

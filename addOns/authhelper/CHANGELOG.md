@@ -3,6 +3,13 @@ All notable changes to this add-on will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## Unreleased
+### Added
+  - Tokens are refreshed shortly before they expire (when the token endpoint reports `expires_in`, or the token is a JWT with an `exp` claim) while the user is in use, using the refresh token if there is one, otherwise authenticating again.
+  - If a user is found not to be authenticated after their tokens were refreshed, the configured grant is used, not the refresh token again.
+  - Refreshing ahead of the expiry is retried (after 10, 30 and 90 seconds) if the token endpoint fails, but not if it rejects the request (4xx). A refresh token it rejects is not used again.
+  - New stats: `stats.auth.oauth2.refresh.success`, `stats.auth.oauth2.refresh.fallback` and `stats.auth.oauth2.refresh.giveup`.
+
 ## [0.43.0] - 2026-10-08
 ### Added
 - OAuth2 Authentication method, supporting the `client_credentials` and `password` grant types.

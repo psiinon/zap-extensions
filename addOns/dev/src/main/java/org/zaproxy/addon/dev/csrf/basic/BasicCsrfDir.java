@@ -80,6 +80,11 @@ public class BasicCsrfDir extends TestDirectory {
             this.setParent(parent);
         }
 
+        @Override
+        public void reset() {
+            csrfToken = null;
+        }
+
         private boolean hasValidToken(TreeSet<HtmlParameter> params) {
             return params.stream()
                     .filter(p -> p.getName().equals("csrf_token"))

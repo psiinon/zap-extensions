@@ -182,6 +182,13 @@ public class SSO2RootDir extends TestAuthDirectory {
                 });
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+        loginTokens.clear();
+        apiTokens.clear();
+    }
+
     private String getLoginToken() {
         String token = RandomStringUtils.secure().nextAlphanumeric(32);
         loginTokens.add(token);

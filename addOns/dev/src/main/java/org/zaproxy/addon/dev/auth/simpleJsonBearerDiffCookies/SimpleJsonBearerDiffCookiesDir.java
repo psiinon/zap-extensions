@@ -40,6 +40,12 @@ public class SimpleJsonBearerDiffCookiesDir extends TestAuthDirectory {
         this.addPage(new SimpleJsonBearerDiffCookiesVerificationPage(server, this));
     }
 
+    @Override
+    public void reset() {
+        super.reset();
+        cookies.clear();
+    }
+
     protected String getCookie(String user) {
         cookies.put(user, RandomStringUtils.secure().nextAlphanumeric(32));
         return cookies.get(user);

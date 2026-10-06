@@ -59,14 +59,41 @@ and you have set the Access Token Field and Refresh Token Field.
 
 <h3>Refresh Tokens</h3>
 If the token response includes a refresh token, ZAP stores it automatically and uses it the next time the user needs to be
-authenticated again. If the server rejects it, ZAP falls back to the configured grant type. Servers which issue a new refresh
-token each time are supported.
+authenticated again, or their tokens are about to expire. If the server rejects it, ZAP does not use it again and falls back
+to the configured grant type. Servers which issue a new refresh token each time are supported.
 <p>
-<b>Note:</b> ZAP does not track when the access token expires. It only authenticates again when it detects that the user is
-no longer logged in, so without Verification an expired token may continue to be sent.
+If the user is found not to be authenticated (see Verification below) and the tokens they have were themselves obtained with
+a refresh token, the configured grant type is used, as the refresh token is not expected to give better ones.
+
+<h3>Refreshing Before the Access Token Expires</h3>
+If the token response says how long the access token is valid for, using <code>expires_in</code> or, if the access token is
+a JWT, its <code>exp</code> claim, ZAP refreshes the tokens shortly before they expire, so that requests are not sent
+with an expired token. The refresh is done 20% of the lifetime before the expiry, up to 30 seconds, and happens again
+for each new set of tokens. It uses the refresh token if there is one, otherwise the user is authenticated again with the configured
+grant type.
+<p>
+Users are only refreshed while they are being used: if no requests were sent as the user for twice the lifetime of the tokens, and at
+least 5 minutes, ZAP stops refreshing them, for example once a scan has finished. If the user is used again and the
+tokens have expired, the user is authenticated again as described under Verification.
+<p>
+If the token endpoint fails (for example with a server error) the refresh is retried after 10, 30 and 90 seconds. If the token
+endpoint rejects the request (a 4xx response, for example because the credentials are wrong) it is not retried, so as not
+to repeat requests that are not going to work. If it is given up on, the reason is shown for the user as the last
+authentication failure.
+<p>
+These statistics are recorded, for the site of the token endpoint:
+<table>
+  <tr><th>Statistic</th><th>Description</th></tr>
+  <tr><td><code>stats.auth.oauth2.refresh.success</code></td><td>The tokens were refreshed before they expired, using the refresh token.</td></tr>
+  <tr><td><code>stats.auth.oauth2.refresh.fallback</code></td><td>The refresh token could not be used (there was none, or it was rejected), so the user was authenticated again with the configured grant type.</td></tr>
+  <tr><td><code>stats.auth.oauth2.refresh.giveup</code></td><td>Refreshing before the tokens expire was given up on.</td></tr>
+</table>
+If the token response does not say when the tokens expire then they are not refreshed before they do, ZAP only authenticates the
+user again when it detects that they are no longer logged in.
 
 <h3>Verification</h3>
-Verification is how ZAP detects that the user is no longer logged in, which triggers a new authentication.
+Verification is how ZAP detects that the user is no longer logged in, which triggers a new authentication, and the
+request that found that out is sent again.
 If Session Management and/or Verification are set to <code>autodetect</code>, they are configured automatically
 when authentication succeeds:
 <ul>

@@ -50,6 +50,11 @@ public class SequencePage extends TestPage {
         this.server = server;
     }
 
+    @Override
+    public void reset() {
+        seqMap.clear();
+    }
+
     /**
      * Set the number of steps to be used in the sequence, default is 3. This is designed to be
      * called from a script.

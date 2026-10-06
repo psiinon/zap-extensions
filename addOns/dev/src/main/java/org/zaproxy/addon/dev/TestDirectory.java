@@ -189,6 +189,18 @@ public class TestDirectory implements HttpMessageHandler {
         }
     }
 
+    /**
+     * Resets any state built up while the directory, its pages and sub directories were used (for
+     * example tokens that have been issued) so they are as they were when they were created, called
+     * when ZAP's session changes. Settings are not state, so are not reset.
+     *
+     * <p>Subclasses with state should override this, calling the super implementation.
+     */
+    public void reset() {
+        subDirs.values().forEach(TestDirectory::reset);
+        pages.values().forEach(TestPage::reset);
+    }
+
     public void addDirectory(TestDirectory td) {
         this.subDirs.put(td.getName(), td);
         td.setParent(this);
