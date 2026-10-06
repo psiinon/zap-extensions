@@ -4,7 +4,9 @@ All notable changes to this add-on will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
-
+### Added
+- Support for OAuth2.0 automatic token refresh.
+- New stats: `stats.auth.oauth2.refresh.success`, `stats.auth.oauth2.refresh.fallback` and `stats.auth.oauth2.refresh.giveup`.
 
 ## [0.44.0] - 2026-11-03
 ### Added

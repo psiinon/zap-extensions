@@ -52,6 +52,7 @@ import org.parosproxy.paros.model.HistoryReference;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.view.View;
+import org.zaproxy.addon.authhelper.internal.OAuth2TokenRefresher;
 import org.zaproxy.addon.authhelper.internal.db.TableJdo;
 import org.zaproxy.addon.authhelper.internal.ui.diags.AuthDiagsPanel;
 import org.zaproxy.addon.commonlib.internal.TotpSupport;
@@ -121,6 +122,7 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
     private AuthhelperParam param;
     private TableJdo tableJdo;
     private AuthHeaderTracker authHeaderTracker;
+    private volatile OAuth2TokenRefresher oauth2TokenRefresher;
 
     public ExtensionAuthhelper() {
         super();
@@ -202,6 +204,15 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
         AuthUtils.clean();
 
         TotpSupport.setTotpGenerator(null);
+        shutdownOAuth2TokenRefresher();
+    }
+
+    private void shutdownOAuth2TokenRefresher() {
+        OAuth2AuthenticationMethodType.setTokenRefresher(null);
+        if (oauth2TokenRefresher != null) {
+            oauth2TokenRefresher.shutdown();
+            oauth2TokenRefresher = null;
+        }
     }
 
     @Override
@@ -212,6 +223,7 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
 
     @Override
     public void destroy() {
+        shutdownOAuth2TokenRefresher();
         if (tableJdo != null) {
             tableJdo.unload();
         }
@@ -222,6 +234,9 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
         extensionHook.addSessionListener(new AuthSessionChangedListener());
         extensionHook.addSessionListener(historyProvider);
         extensionHook.addHttpSenderListener(authHeaderTracker);
+        oauth2TokenRefresher = new OAuth2TokenRefresher();
+        OAuth2AuthenticationMethodType.setTokenRefresher(oauth2TokenRefresher);
+        extensionHook.addHttpSenderListener(oauth2TokenRefresher);
         extensionHook.addOptionsParamSet(getParam());
         if (hasView()) {
             extensionHook.getHookMenu().addToolsMenuItem(getAuthTesterMenu());
@@ -382,6 +397,9 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
         public void sessionChanged(Session session) {
             contextIdToLoginDetails.clear();
             authHeaderTracker.clear();
+            if (oauth2TokenRefresher != null) {
+                oauth2TokenRefresher.cancelAll();
+            }
             AuthUtils.clean();
         }
 

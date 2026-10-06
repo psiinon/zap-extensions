@@ -24,11 +24,17 @@ import java.awt.GridBagLayout;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
@@ -40,6 +46,7 @@ import net.sf.json.JSONObject;
 import org.apache.commons.configuration.Configuration;
 import org.apache.commons.configuration.ConfigurationException;
 import org.apache.commons.httpclient.URI;
+import org.apache.commons.httpclient.URIException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -56,6 +63,11 @@ import org.parosproxy.paros.network.HttpSender;
 import org.parosproxy.paros.network.HttpStatusCode;
 import org.parosproxy.paros.view.View;
 import org.zaproxy.addon.authhelper.internal.ExtraParamsPanel;
+import org.zaproxy.addon.authhelper.internal.OAuth2TokenLifetime;
+import org.zaproxy.addon.authhelper.internal.OAuth2TokenRefresher;
+import org.zaproxy.addon.authhelper.internal.OAuth2TokenRefresher.RefreshAction;
+import org.zaproxy.addon.authhelper.internal.OAuth2TokenRefresher.RefreshResult;
+import org.zaproxy.addon.authhelper.internal.OAuth2TokenRefresher.UserKey;
 import org.zaproxy.zap.authentication.AbstractAuthenticationMethodOptionsPanel;
 import org.zaproxy.zap.authentication.AbstractCredentialsOptionsPanel;
 import org.zaproxy.zap.authentication.AuthenticationCredentials;
@@ -68,14 +80,17 @@ import org.zaproxy.zap.extension.api.ApiException;
 import org.zaproxy.zap.extension.api.ApiResponse;
 import org.zaproxy.zap.extension.api.ApiResponseSet;
 import org.zaproxy.zap.extension.authentication.AuthenticationAPI;
+import org.zaproxy.zap.extension.users.ContextUserAuthManager;
 import org.zaproxy.zap.extension.users.ExtensionUserManagement;
 import org.zaproxy.zap.extension.users.UsersAPI;
 import org.zaproxy.zap.model.Context;
+import org.zaproxy.zap.model.SessionStructure;
 import org.zaproxy.zap.session.SessionManagementMethod;
 import org.zaproxy.zap.session.WebSession;
 import org.zaproxy.zap.users.User;
 import org.zaproxy.zap.utils.ApiUtils;
 import org.zaproxy.zap.utils.EncodingUtils;
+import org.zaproxy.zap.utils.Stats;
 import org.zaproxy.zap.utils.ZapTextField;
 import org.zaproxy.zap.view.DynamicFieldsPanel;
 import org.zaproxy.zap.view.LayoutHelper;
@@ -91,6 +106,21 @@ import org.zaproxy.zap.view.LayoutHelper;
  */
 public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
 
+    /**
+     * Stat for each time a user's tokens were refreshed, ahead of their expiry, with the refresh
+     * token.
+     */
+    public static final String REFRESH_SUCCESS_STATS = "stats.auth.oauth2.refresh.success";
+
+    /**
+     * Stat for each time a user's tokens could not be refreshed, ahead of their expiry, with the
+     * refresh token (none, or rejected) and the user was authenticated again instead.
+     */
+    public static final String REFRESH_FALLBACK_STATS = "stats.auth.oauth2.refresh.fallback";
+
+    /** Stat for each time refreshing a user's tokens, ahead of their expiry, was given up on. */
+    public static final String REFRESH_GIVE_UP_STATS = "stats.auth.oauth2.refresh.giveup";
+
     private static final int METHOD_IDENTIFIER = 9;
 
     private static final String API_METHOD_NAME = "oauth2Authentication";
@@ -105,6 +135,9 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
     public static final String CLIENT_AUTH_NONE = "none";
 
     private static final String DEFAULT_ACCESS_TOKEN_FIELD = "access_token";
+    private static final int STATUS_REQUEST_TIMEOUT = 408;
+    private static final int STATUS_TOO_MANY_REQUESTS = 429;
+
     private static final String DEFAULT_REFRESH_TOKEN_FIELD = "refresh_token";
 
     private static final String CREDENTIAL_PARAM_USERNAME = "username";
@@ -154,6 +187,17 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
 
     private static final Logger LOGGER = LogManager.getLogger(OAuth2AuthenticationMethodType.class);
 
+    private static volatile OAuth2TokenRefresher tokenRefresher;
+
+    /**
+     * Sets the refresher used to refresh the tokens of users ahead of their expiry.
+     *
+     * @param refresher the refresher, or {@code null} to not refresh ahead of expiry.
+     */
+    static void setTokenRefresher(OAuth2TokenRefresher refresher) {
+        tokenRefresher = refresher;
+    }
+
     public class OAuth2AuthenticationMethod extends AuthenticationMethod {
 
         private String grantType = GRANT_TYPE_CLIENT_CREDENTIALS;
@@ -168,6 +212,26 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
         private boolean diagnostics;
 
         private HttpSender httpSender;
+
+        /**
+         * When the access token of each user expires, by user ID. Transient, so not copied or
+         * persisted.
+         */
+        private final Map<Integer, Instant> tokenExpiries = new ConcurrentHashMap<>();
+
+        /**
+         * The IDs of the users whose current tokens were obtained with a refresh token. If those
+         * are rejected then using the refresh token again is not expected to help. Transient, so
+         * not copied or persisted.
+         */
+        private final Set<Integer> usersWithRefreshedTokens = ConcurrentHashMap.newKeySet();
+
+        /**
+         * The IDs of the users for which the token endpoint rejected (with a client error, 4xx) the
+         * last attempt to get tokens with the configured grant, trying again is not expected to
+         * help. Transient, so not copied or persisted.
+         */
+        private final Set<Integer> usersWithPermanentAuthFailure = ConcurrentHashMap.newKeySet();
 
         public OAuth2AuthenticationMethod() {}
 
@@ -317,6 +381,24 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                                 + credentials.getClass());
             }
 
+            // Serialised per user, as refresh tokens might be rotated by the IdP, in which case
+            // each one can only be used once.
+            synchronized (cred) {
+                // Authenticating, instead of refreshing ahead of the expiry, is done when the user
+                // was found not to be authenticated, if the tokens are from a refresh token then
+                // using it again is not expected to help, so the configured grant is used.
+                WebSession session =
+                        authenticate(cred, user, !usersWithRefreshedTokens.contains(user.getId()));
+                if (session == null) {
+                    tokenExpiries.remove(user.getId());
+                    cancelRefresh(user);
+                }
+                return session;
+            }
+        }
+
+        private WebSession authenticate(
+                GenericAuthenticationCredentials cred, User user, boolean tryRefreshToken) {
             try (AuthenticationDiagnostics diags =
                     new AuthenticationDiagnostics(
                             diagnostics, getName(), user.getContext().getName(), user.getName())) {
@@ -328,6 +410,7 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                     user.getAuthenticationState()
                             .setLastAuthFailure("OAuth2 method not fully configured");
                     diags.recordErrorStep(null);
+                    usersWithPermanentAuthFailure.add(user.getId());
                     return null;
                 }
 
@@ -335,22 +418,11 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                         user.getContext(), "Authorization", "Bearer {%json:access_token%}");
                 AuthUtils.resolveAutoDetectVerification(
                         this, "\\Q 200 OK\\E", "\\Q 401 Unauthorized\\E");
-                sessionManagementMethod = user.getContext().getSessionManagementMethod();
 
-                String cachedRefreshToken = cred.getParam(CREDENTIAL_PARAM_REFRESH_TOKEN);
-                HttpMessage msg = null;
-                if (StringUtils.isNotEmpty(cachedRefreshToken)) {
-                    HttpMessage refreshMsg =
-                            attemptGrant(
-                                    GRANT_TYPE_REFRESH_TOKEN,
-                                    cred,
-                                    cachedRefreshToken,
-                                    diags,
-                                    user);
-                    if (refreshMsg != null && isSuccessfulTokenResponse(refreshMsg)) {
-                        msg = refreshMsg;
-                    }
-                }
+                usersWithPermanentAuthFailure.remove(user.getId());
+                HttpMessage msg =
+                        tryRefreshToken ? attemptRefreshGrant(cred, diags, user).message() : null;
+                boolean refreshed = msg != null;
 
                 if (msg == null) {
                     msg = attemptGrant(grantType, cred, null, diags, user);
@@ -358,6 +430,9 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                         return null;
                     }
                     if (!isSuccessfulTokenResponse(msg)) {
+                        if (!isTransientFailure(msg)) {
+                            usersWithPermanentAuthFailure.add(user.getId());
+                        }
                         user.getAuthenticationState()
                                 .setLastAuthFailure(
                                         "OAuth2 token endpoint did not return a valid access"
@@ -370,10 +445,7 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                     }
                 }
 
-                captureTokens(msg, cred);
-
-                WebSession session = sessionManagementMethod.extractWebSession(msg);
-                user.setAuthenticatedSession(session);
+                WebSession session = applyTokenResponse(msg, cred, user, refreshed);
 
                 if (this.isAuthenticated(msg, user, true)) {
                     AuthenticationHelper.notifyOutputAuthSuccessful(msg);
@@ -381,18 +453,268 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                     diags.recordStep(
                             Constant.messages.getString(
                                     "authhelper.auth.method.diags.steps.authenticated"));
+                    scheduleRefresh(user);
                     return session;
                 }
 
                 user.getAuthenticationState()
                         .setLastAuthFailure("OAuth2 authentication verification failed");
                 user.setAuthenticatedSession(null);
+                usersWithPermanentAuthFailure.add(user.getId());
                 AuthenticationHelper.notifyOutputAuthFailure(msg);
                 diags.recordStep(
                         Constant.messages.getString(
                                 "authhelper.auth.method.diags.steps.unauthenticated"));
                 return null;
             }
+        }
+
+        /**
+         * Gets when the user's current access token expires, as reported by the token endpoint
+         * ({@code expires_in}) or by the token itself (JWT {@code exp} claim).
+         *
+         * @param user the user.
+         * @return the expiry, empty if it is not known.
+         */
+        Optional<Instant> getTokenExpiry(User user) {
+            return Optional.ofNullable(tokenExpiries.get(user.getId()));
+        }
+
+        /**
+         * Refreshes the user's tokens using the cached refresh token, without verifying the
+         * resulting session and without falling back to the configured grant. The user's current
+         * session is left untouched if the refresh fails.
+         *
+         * @param user the user to refresh the session of.
+         * @return {@code true} if the tokens were refreshed and the user's session updated, {@code
+         *     false} otherwise.
+         */
+        boolean refreshSession(User user) {
+            return tryRefreshSession(user) == RefreshOutcome.REFRESHED;
+        }
+
+        private RefreshOutcome tryRefreshSession(User user) {
+            if (!(user.getAuthenticationCredentials()
+                    instanceof GenericAuthenticationCredentials cred)) {
+                return RefreshOutcome.FAILED;
+            }
+            synchronized (cred) {
+                RefreshGrantResult result = attemptRefreshGrant(cred, null, user);
+                if (result.message() == null) {
+                    return result.transientFailure()
+                            ? RefreshOutcome.TRANSIENT_FAILURE
+                            : RefreshOutcome.FAILED;
+                }
+                applyTokenResponse(result.message(), cred, user, true);
+                scheduleRefresh(user);
+                return RefreshOutcome.REFRESHED;
+            }
+        }
+
+        /**
+         * Schedules the refresh of the user's tokens, ahead of their expiry, if the expiry is known
+         * and the refresher is available.
+         */
+        private void scheduleRefresh(User user) {
+            OAuth2TokenRefresher refresher = tokenRefresher;
+            if (refresher == null) {
+                return;
+            }
+            UserKey key = UserKey.of(user);
+            Duration lifetime =
+                    getTokenExpiry(user)
+                            .map(expiry -> Duration.between(Instant.now(), expiry))
+                            .orElse(Duration.ZERO);
+            if (lifetime.isPositive()) {
+                refresher.schedule(key, lifetime, new TokenRefreshAction(key));
+            } else {
+                refresher.cancel(key);
+            }
+        }
+
+        private void incStat(String stat) {
+            try {
+                Stats.incCounter(SessionStructure.getHostName(new URI(tokenEndpoint, true)), stat);
+            } catch (URIException e) {
+                LOGGER.debug("Unable to record stat {}: {}", stat, e.getMessage());
+            }
+        }
+
+        private void cancelRefresh(User user) {
+            OAuth2TokenRefresher refresher = tokenRefresher;
+            if (refresher != null) {
+                refresher.cancel(UserKey.of(user));
+            }
+        }
+
+        /**
+         * The refresh of a user's tokens, when they are about to expire. Refreshes using the
+         * refresh token, falling back to authenticating again if that is not possible.
+         */
+        private final class TokenRefreshAction implements RefreshAction {
+
+            private final UserKey key;
+
+            TokenRefreshAction(UserKey key) {
+                this.key = key;
+            }
+
+            private User findUser() {
+                ExtensionUserManagement extUser =
+                        AuthUtils.getExtension(ExtensionUserManagement.class);
+                if (extUser == null) {
+                    return null;
+                }
+                ContextUserAuthManager userManager =
+                        extUser.getContextUserAuthManager(key.contextId());
+                return userManager == null ? null : userManager.getUserById(key.userId());
+            }
+
+            @Override
+            public boolean isValid() {
+                User user = findUser();
+                return user != null
+                        && user.getContext().getAuthenticationMethod()
+                                == OAuth2AuthenticationMethod.this;
+            }
+
+            @Override
+            public RefreshResult refresh() {
+                User user = findUser();
+                if (user == null
+                        || !(user.getAuthenticationCredentials()
+                                instanceof GenericAuthenticationCredentials cred)) {
+                    return RefreshResult.GIVE_UP;
+                }
+                RefreshOutcome outcome = tryRefreshSession(user);
+                if (outcome == RefreshOutcome.REFRESHED) {
+                    incStat(REFRESH_SUCCESS_STATS);
+                    return RefreshResult.REFRESHED;
+                }
+                if (outcome == RefreshOutcome.TRANSIENT_FAILURE) {
+                    // The refresh token was not rejected, the token endpoint just failed to
+                    // handle the request. Not sending the credentials, try again.
+                    return RefreshResult.RETRY;
+                }
+                incStat(REFRESH_FALLBACK_STATS);
+                // Not cancelling the refresh on failure, it might be retried. The refresh token was
+                // not used, or could not be used, no point in trying it again.
+                synchronized (cred) {
+                    if (authenticate(cred, user, false) != null) {
+                        return RefreshResult.REFRESHED;
+                    }
+                    // If trying again will not help, for example the token endpoint rejected the
+                    // request or the session could not be verified, then do not, as it could lock
+                    // the account.
+                    return usersWithPermanentAuthFailure.contains(user.getId())
+                            ? RefreshResult.GIVE_UP
+                            : RefreshResult.RETRY;
+                }
+            }
+
+            @Override
+            public void onGiveUp() {
+                incStat(REFRESH_GIVE_UP_STATS);
+                User user = findUser();
+                if (user != null) {
+                    user.getAuthenticationState()
+                            .setLastAuthFailure(
+                                    Constant.messages.getString(
+                                            "authhelper.auth.method.oauth2.refresh.failed"));
+                }
+            }
+        }
+
+        /** The outcome of using the cached refresh token. */
+        private enum RefreshOutcome {
+            REFRESHED,
+            /** Failed, but trying again later might work, for example a server error. */
+            TRANSIENT_FAILURE,
+            /** Failed, there is no refresh token or it can not be used. */
+            FAILED
+        }
+
+        /**
+         * The outcome of requesting new tokens with the refresh token.
+         *
+         * @param message the successful token response, {@code null} if there was none.
+         * @param transientFailure {@code true} if there was no successful response but trying again
+         *     later might work.
+         */
+        private record RefreshGrantResult(HttpMessage message, boolean transientFailure) {}
+
+        /**
+         * Requests new tokens using the cached refresh token, if there is one.
+         *
+         * @return the result, without a message if there is no cached refresh token or the refresh
+         *     did not succeed.
+         */
+        private RefreshGrantResult attemptRefreshGrant(
+                GenericAuthenticationCredentials cred, AuthenticationDiagnostics diags, User user) {
+            String cachedRefreshToken = cred.getParam(CREDENTIAL_PARAM_REFRESH_TOKEN);
+            if (StringUtils.isEmpty(cachedRefreshToken)) {
+                return new RefreshGrantResult(null, false);
+            }
+            HttpMessage msg =
+                    attemptGrant(GRANT_TYPE_REFRESH_TOKEN, cred, cachedRefreshToken, diags, user);
+            if (msg == null) {
+                // It could not be sent, for example a network error.
+                return new RefreshGrantResult(null, true);
+            }
+            if (isSuccessfulTokenResponse(msg)) {
+                return new RefreshGrantResult(msg, false);
+            }
+            if (isInvalidGrant(msg)) {
+                // It was rejected, so there is no point in using it again.
+                cred.setParam(CREDENTIAL_PARAM_REFRESH_TOKEN, "");
+            }
+            return new RefreshGrantResult(null, isTransientFailure(msg));
+        }
+
+        /**
+         * Tells whether the token endpoint failed to handle the request, for example it is rate
+         * limited or timed out, as opposed to refusing it, so trying again later might work.
+         */
+        private static boolean isTransientFailure(HttpMessage msg) {
+            int status = msg.getResponseHeader().getStatusCode();
+            return status >= 500
+                    || status == STATUS_REQUEST_TIMEOUT
+                    || status == STATUS_TOO_MANY_REQUESTS;
+        }
+
+        /** Tells whether the token endpoint reported that the grant (token) is no longer valid. */
+        private static boolean isInvalidGrant(HttpMessage msg) {
+            try {
+                return "invalid_grant"
+                        .equals(
+                                JSONObject.fromObject(msg.getResponseBody().toString())
+                                        .opt("error"));
+            } catch (Exception e) {
+                return false;
+            }
+        }
+
+        /**
+         * Captures the tokens from a successful token response and sets the resulting session as
+         * the user's authenticated session.
+         *
+         * @param fromRefresh {@code true} if the tokens were obtained with a refresh token.
+         */
+        private WebSession applyTokenResponse(
+                HttpMessage msg,
+                GenericAuthenticationCredentials cred,
+                User user,
+                boolean fromRefresh) {
+            captureTokens(msg, cred, user);
+            WebSession session =
+                    user.getContext().getSessionManagementMethod().extractWebSession(msg);
+            user.setAuthenticatedSession(session);
+            if (fromRefresh) {
+                usersWithRefreshedTokens.add(user.getId());
+            } else {
+                usersWithRefreshedTokens.remove(user.getId());
+            }
+            return session;
         }
 
         /**
@@ -423,7 +745,7 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                                         + tokenEndpoint
                                         + "': "
                                         + e.getMessage());
-                diags.recordErrorStep(null);
+                recordErrorStep(diags);
                 return null;
             }
 
@@ -434,13 +756,19 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
                 user.getAuthenticationState()
                         .setLastAuthFailure(
                                 "Unable to send OAuth2 token request: " + e.getMessage());
-                diags.recordErrorStep(null);
+                recordErrorStep(diags);
                 return null;
             }
             AuthenticationHelper.addAuthMessageToHistory(msg);
 
             normalizeTokenResponse(msg);
             return msg;
+        }
+
+        private static void recordErrorStep(AuthenticationDiagnostics diags) {
+            if (diags != null) {
+                diags.recordErrorStep(null);
+            }
         }
 
         private boolean isSuccessfulTokenResponse(HttpMessage msg) {
@@ -460,10 +788,17 @@ public class OAuth2AuthenticationMethodType extends AuthenticationMethodType {
          * stores it internally so it can be reused on subsequent authentications (kept up to date
          * across rotations), without any user configuration.
          */
-        private void captureTokens(HttpMessage msg, GenericAuthenticationCredentials cred) {
+        private void captureTokens(
+                HttpMessage msg, GenericAuthenticationCredentials cred, User user) {
             try {
                 JSONObject json = JSONObject.fromObject(msg.getResponseBody().toString());
                 captureIfPresent(json, "refresh_token", cred, CREDENTIAL_PARAM_REFRESH_TOKEN);
+                OAuth2TokenLifetime.fromResponse(json, Clock.systemUTC())
+                        .ifPresentOrElse(
+                                lifetime ->
+                                        tokenExpiries.put(
+                                                user.getId(), Instant.now().plus(lifetime)),
+                                () -> tokenExpiries.remove(user.getId()));
             } catch (Exception e) {
                 LOGGER.debug("Unable to capture OAuth2 tokens: {}", e.getMessage());
             }
