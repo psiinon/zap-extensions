@@ -1,0 +1,60 @@
+---
+# Checks the LLM add-on can be configured to use the fake LLM, and that the fake LLM serves
+# the default and named rule sets, and refuses unknown ones.
+env:
+  contexts:
+  - name: "fake-llm"
+    urls:
+    - "http://localhost:9091/llm/fake"
+    includePaths:
+    - "http://localhost:9091/llm/fake.*"
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    continueOnFailure: false
+    progressToStdout: true
+  vars: {}
+jobs:
+- type: "llm-config"
+  name: "llm-config"
+  parameters:
+    deleteExisting: true
+    defaultProvider: "fake"
+    defaultModel: "fake-llm"
+  providers:
+  - name: "fake"
+    type: "OPENAI_COMPATIBLE"
+    endpoint: "http://localhost:9091/llm/fake/v1"
+    models:
+    - "fake-llm"
+    trusted: true
+- type: "requestor"
+  name: "default rules"
+  requests:
+  - url: "http://localhost:9091/llm/fake/v1/chat/completions"
+    method: "POST"
+    headers:
+    - "Content-Type: application/json"
+    data: '{"model":"fake-llm","messages":[{"role":"user","content":"ping"}]}'
+    responseCode: 200
+  - url: "http://localhost:9091/llm/fake/v1/models"
+    method: "GET"
+    responseCode: 200
+- type: "requestor"
+  name: "named rule set"
+  requests:
+  - url: "http://localhost:9091/llm/fake/example/v1/chat/completions"
+    method: "POST"
+    headers:
+    - "Content-Type: application/json"
+    data: '{"model":"fake-llm","messages":[{"role":"user","content":"ping"}]}'
+    responseCode: 200
+- type: "requestor"
+  name: "unknown rule set"
+  requests:
+  - url: "http://localhost:9091/llm/fake/unknown/v1/chat/completions"
+    method: "POST"
+    headers:
+    - "Content-Type: application/json"
+    data: '{"model":"fake-llm","messages":[{"role":"user","content":"ping"}]}'
+    responseCode: 404

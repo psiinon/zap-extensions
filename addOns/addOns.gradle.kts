@@ -1,5 +1,6 @@
 import me.champeau.gradle.japicmp.JapicmpTask
 import org.cyclonedx.gradle.CycloneDxTask
+import org.gradle.api.artifacts.ProjectDependency
 import org.gradle.api.internal.provider.TransformBackedProvider
 import org.zaproxy.gradle.addon.AddOnPlugin
 import org.zaproxy.gradle.addon.AddOnPluginExtension
@@ -87,7 +88,9 @@ subprojects {
         return@subprojects
     }
 
-    val useCrowdin = !crowdinExcludedProjects.contains(project)
+    // Test add-ons contain test apps for integration tests, they must never be released.
+    val testAddOn = project.isTestAddOn()
+    val useCrowdin = !testAddOn && !crowdinExcludedProjects.contains(project)
     val mavenPublishAddOn = project.hasProperty("zap.maven.publish", "true")
     val japicmpAddOn = project.hasProperty("zap.japicmp", "true")
 
@@ -287,6 +290,15 @@ subprojects {
         }
     }
 
+    afterEvaluate {
+        verifyTestAddOnSetUp(testAddOn)
+    }
+
+    if (testAddOn) {
+        // No release wiring, test add-ons are never tagged, published or added to the marketplace.
+        return@subprojects
+    }
+
     val projectInfo = ProjectInfo.from(project)
     generateReleaseStateLastCommit {
         projects.add(projectInfo)
@@ -476,7 +488,7 @@ val crowdinUploadSourceFiles by tasks.registering {
                 require(project != null) { "Add-on with project name $name not found." }
 
                 project
-            }.filter { !crowdinExcludedProjects.contains(it) }
+            }.filter { !crowdinExcludedProjects.contains(it) && !it.isTestAddOn() }
 
         projects.forEach {
             dependsOn(it.tasks.named("crowdinUploadSourceFiles"))
@@ -490,6 +502,7 @@ val createPullRequestRelease by tasks.registering(CreatePullRequest::class) {
             splitAddOnIds(it).map { name ->
                 val project = subprojects.find { it.name == name }
                 require(project != null) { "Add-on with project name $name not found." }
+                require(!project.isTestAddOn()) { "Add-on $name is a test add-on, it cannot be released." }
                 project
             }
 
@@ -624,6 +637,31 @@ fun Project.hasProperty(
     name: String,
     value: String,
 ) = hasProperty(name) && property(name) == value
+
+/**
+ * Tells if the project is a test add-on, which holds test apps and integration tests for another
+ * add-on. They are marked with `zap.test.addon=true` in their `gradle.properties` and are never
+ * released.
+ */
+fun Project.isTestAddOn() = hasProperty("zap.test.addon", "true")
+
+/**
+ * Verifies that test add-ons are set up so that they cannot be released, and that no other add-on
+ * depends on them.
+ */
+fun Project.verifyTestAddOnSetUp(testAddOn: Boolean) {
+    if (testAddOn) {
+        check(name.endsWith("Test")) { "Test add-on $name must have a name ending in 'Test'." }
+        check(!hasProperty("release", "true")) { "Test add-on $name must not be released (release=true)." }
+        return
+    }
+
+    check(!name.endsWith("Test")) { "Add-on $name has a name reserved for test add-ons, set zap.test.addon=true." }
+    val testAddOns = rootProject.subprojects.filter { it.isTestAddOn() }.map { it.path }.toSet()
+    configurations.named("zapAddOn").get().dependencies.withType<ProjectDependency>().forEach {
+        check(!testAddOns.contains(it.path)) { "Add-on $name must not depend on the test add-on ${it.path}." }
+    }
+}
 
 fun Project.addOnJar(version: String): File {
     val oldGroup = group
