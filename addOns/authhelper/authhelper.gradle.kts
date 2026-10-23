@@ -72,7 +72,7 @@ zapAddOn {
                 dependencies {
                     addOns {
                         register("llm") {
-                            version.set(">=0.0.1")
+                            version.set(">=0.2.0")
                         }
                     }
                 }
@@ -81,7 +81,7 @@ zapAddOn {
         dependencies {
             addOns {
                 register("commonlib") {
-                    version.set(">= 1.44.0 & < 2.0.0")
+                    version.set(">= 1.45.0 & < 2.0.0")
                 }
                 register("database") {
                     version.set(">=0.8.0 & < 1.0.0")
@@ -96,7 +96,7 @@ zapAddOn {
                     version.set(">=15.44.0")
                 }
                 register("zest") {
-                    version.set(">=48.10.0")
+                    version.set(">=48.15.0")
                 }
             }
         }

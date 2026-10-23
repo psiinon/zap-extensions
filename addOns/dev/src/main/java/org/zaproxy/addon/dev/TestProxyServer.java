@@ -225,6 +225,7 @@ public class TestProxyServer {
      * been issued, called when ZAP's session changes.
      */
     public void reset() {
+        LOGGER.info("Resetting the state of the test apps, the session changed.");
         root.reset();
     }
 

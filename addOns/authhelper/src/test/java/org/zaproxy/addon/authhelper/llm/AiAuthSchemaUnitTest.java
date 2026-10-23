@@ -26,6 +26,7 @@ import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
@@ -178,7 +179,19 @@ class AiAuthSchemaUnitTest {
         void shouldSerializeTurnPayloadWithPlaceholders() throws Exception {
             var inputElement =
                     new AiAuthInputElement(
-                            "input", "email", "user", "user", "Username:", "", "", null, true);
+                            "input",
+                            "email",
+                            "user",
+                            "user",
+                            "Username:",
+                            "",
+                            "",
+                            null,
+                            true,
+                            null,
+                            null,
+                            null,
+                            "#user");
             var payload =
                     new AiAuthTurnPayload(
                             1,
@@ -186,18 +199,22 @@ class AiAuthSchemaUnitTest {
                             "Login",
                             List.of(inputElement),
                             List.of(),
+                            List.of(),
                             Map.of(
                                     "username",
                                     AiAuthTurnPayload.USERNAME_PLACEHOLDER,
                                     "password",
                                     AiAuthTurnPayload.PASSWORD_PLACEHOLDER),
                             "Set domain to Project1",
+                            null,
                             null);
 
             String json = mapper.writeValueAsString(payload);
 
             assertThat(json, containsString("\"{{username}}\""));
             assertThat(json, containsString("\"{{password}}\""));
+            assertThat(json, not(containsString("totpDigits")));
+            assertThat(json, containsString("\"cssPath\":\"#user\""));
             assertThat(json, containsString("\"step\":1"));
             assertThat(json, containsString("\"url\":\"http://localhost/login\""));
             assertThat(json, containsString("\"userHint\":\"Set domain to Project1\""));
@@ -219,7 +236,11 @@ class AiAuthSchemaUnitTest {
                                     "beta.example.com",
                                     "Project1",
                                     "Project2"),
-                            true);
+                            true,
+                            null,
+                            null,
+                            null,
+                            "#domain");
             var payload =
                     new AiAuthTurnPayload(
                             1,
@@ -227,7 +248,9 @@ class AiAuthSchemaUnitTest {
                             "Login",
                             List.of(selectElement),
                             List.of(),
+                            List.of(),
                             Map.of(),
+                            null,
                             null,
                             null);
 
@@ -235,6 +258,62 @@ class AiAuthSchemaUnitTest {
 
             assertThat(json, containsString("\"options\":[\"alpha.example.com\""));
             assertThat(json, containsString("\"Project1\""));
+        }
+
+        @Test
+        void shouldSerializeTotpPlaceholderAndDigits() throws Exception {
+            var otpBox =
+                    new AiAuthInputElement(
+                            "input",
+                            "text",
+                            null,
+                            null,
+                            null,
+                            null,
+                            "",
+                            null,
+                            true,
+                            1,
+                            "numeric",
+                            "one-time-code",
+                            "body > form > input:nth-of-type(1)");
+            var payload =
+                    new AiAuthTurnPayload(
+                            2,
+                            "http://localhost/mfa",
+                            "Verify",
+                            List.of(otpBox),
+                            List.of(),
+                            List.of(),
+                            Map.of(
+                                    AiAuthTurnPayload.TOTP_CREDENTIAL,
+                                    AiAuthTurnPayload.TOTP_PLACEHOLDER),
+                            null,
+                            null,
+                            6);
+
+            String json = mapper.writeValueAsString(payload);
+
+            assertThat(json, containsString("\"totp\":\"{{totp}}\""));
+            assertThat(json, containsString("\"totpDigits\":6"));
+            assertThat(json, containsString("\"maxLength\":1"));
+            assertThat(json, containsString("\"inputMode\":\"numeric\""));
+            assertThat(json, containsString("\"autocomplete\":\"one-time-code\""));
+            assertThat(json, containsString("\"cssPath\":\"body > form > input:nth-of-type(1)\""));
+        }
+
+        @Test
+        void shouldDeserializeElementWithoutNewAttributes() throws Exception {
+            String json =
+                    """
+                    {"tag":"input","type":"text","id":"a","name":null,"label":null,
+                     "placeholder":null,"value":null,"options":null,"visible":true}
+                    """;
+
+            AiAuthInputElement element = mapper.readValue(json, AiAuthInputElement.class);
+
+            assertThat(element.maxLength(), nullValue());
+            assertThat(element.isSingleCharacterInput(), is(false));
         }
 
         @Test
@@ -250,7 +329,9 @@ class AiAuthSchemaUnitTest {
                             "Step 2",
                             List.of(),
                             List.of(ok, failed),
+                            List.of(),
                             Map.of(),
+                            null,
                             null,
                             null);
 
@@ -295,6 +376,8 @@ class AiAuthSchemaUnitTest {
         void shouldHaveExpectedPlaceholderValues() {
             assertThat(AiAuthTurnPayload.USERNAME_PLACEHOLDER, equalTo("{{username}}"));
             assertThat(AiAuthTurnPayload.PASSWORD_PLACEHOLDER, equalTo("{{password}}"));
+            assertThat(AiAuthTurnPayload.TOTP_PLACEHOLDER, equalTo("{{totp}}"));
+            assertThat(AiAuthTurnPayload.totpDigitPlaceholder(4), equalTo("{{totp4}}"));
         }
 
         @Test

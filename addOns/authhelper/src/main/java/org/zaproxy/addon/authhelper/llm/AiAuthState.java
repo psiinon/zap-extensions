@@ -27,7 +27,10 @@ public enum AiAuthState {
     SUCCESS,
     /** Authentication failed and cannot be recovered (wrong credentials, server error, etc.). */
     FAILURE,
-    /** An MFA prompt was detected that the LLM cannot satisfy autonomously. */
+    /**
+     * An MFA prompt was detected that cannot be satisfied autonomously, e.g. a push notification,
+     * SMS code, or a one-time code when the user has no TOTP data configured.
+     */
     MFA_REQUIRED,
     /** A CAPTCHA was detected; human intervention is required. */
     CAPTCHA_DETECTED

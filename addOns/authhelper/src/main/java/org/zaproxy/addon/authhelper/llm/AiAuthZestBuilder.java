@@ -19,8 +19,10 @@
  */
 package org.zaproxy.addon.authhelper.llm;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.zaproxy.zap.authentication.ScriptBasedAuthenticationMethodType;
@@ -41,6 +43,12 @@ import org.zaproxy.zest.core.v1.ZestScript;
  *
  * <p>The generated script can be registered with {@link ExtensionZest} and used by {@code
  * ClientScriptBasedAuthenticationMethodType} to replay the authentication flow.
+ *
+ * <p>The LLM credential placeholders are converted to the Zest variables understood by the
+ * authentication runners: {@code {{username}}} and {@code {{password}}} are kept as is, {@code
+ * {{totp}}} becomes {@code {{TOTP}}} and {@code {{totpN}}} becomes {@code {{TOTP_N}}}, all of which
+ * are resolved from the user's credentials each time the script runs. They are also declared as
+ * parameters of the script, so that it can be run manually with the values provided.
  */
 class AiAuthZestBuilder {
 
@@ -56,7 +64,36 @@ class AiAuthZestBuilder {
      */
     private static final String SELECTOR_TYPE = "cssSelector";
 
+    /** Zest variable set by the authentication runners with the whole TOTP code. */
+    static final String TOTP_VARIABLE = "{{TOTP}}";
+
+    /** Prefix of the Zest variables set by the authentication runners with each TOTP digit. */
+    static final String TOTP_DIGIT_VARIABLE_PREFIX = "{{TOTP_";
+
+    /** Matches the TOTP variables in a Zest value, the name is the first group. */
+    private static final Pattern TOTP_VARIABLE_PATTERN =
+            Pattern.compile("\\{\\{(TOTP(?:_\\d+)?)\\}\\}");
+
+    /** Orders the TOTP variable names: {@code TOTP, TOTP_1, ..., TOTP_9, TOTP_10}. */
+    private static final Comparator<String> TOTP_VARIABLE_ORDER =
+            Comparator.comparingInt(String::length).thenComparing(Comparator.naturalOrder());
+
     private AiAuthZestBuilder() {}
+
+    /**
+     * Converts the LLM credential placeholders in the given value to Zest variables.
+     *
+     * @param value the recorded action value, might be {@code null}.
+     * @return the value to use in the Zest statement.
+     */
+    static String toZestValue(String value) {
+        if (value == null || !value.contains("{{totp")) {
+            return value;
+        }
+        return AiAuthTurnPayload.TOTP_DIGIT_PLACEHOLDER
+                .matcher(value.replace(AiAuthTurnPayload.TOTP_PLACEHOLDER, TOTP_VARIABLE))
+                .replaceAll(TOTP_DIGIT_VARIABLE_PREFIX + "$1}}");
+    }
 
     /**
      * Builds a {@link ZestScriptWrapper} from recorded browser actions.
@@ -127,12 +164,21 @@ class AiAuthZestBuilder {
 
         zs.add(new ZestClientLaunch(WINDOW_HANDLE, browserName, loginUrl, headless));
 
-        for (AiAuthActionResult action : actions) {
-            if (!action.success() || action.usedSelector() == null) {
-                continue;
-            }
-            addStep(zs, action);
-        }
+        List<AiAuthActionResult> replayable =
+                actions.stream().filter(a -> a.success() && a.usedSelector() != null).toList();
+        replayable.forEach(action -> addStep(zs, action));
+        getTotpVariables(replayable).forEach(name -> zs.getParameters().addVariable(name, ""));
+    }
+
+    /** The names of the TOTP variables typed by the given actions, in order. */
+    private static List<String> getTotpVariables(List<AiAuthActionResult> actions) {
+        return actions.stream()
+                .filter(a -> a.type() == AiAuthActionType.SEND_KEYS && a.value() != null)
+                .flatMap(a -> TOTP_VARIABLE_PATTERN.matcher(toZestValue(a.value())).results())
+                .map(m -> m.group(1))
+                .distinct()
+                .sorted(TOTP_VARIABLE_ORDER)
+                .toList();
     }
 
     private static void addStep(ZestScript zs, AiAuthActionResult action) {
@@ -149,7 +195,7 @@ class AiAuthZestBuilder {
                                 WINDOW_HANDLE,
                                 SELECTOR_TYPE,
                                 action.usedSelector(),
-                                action.value()));
+                                toZestValue(action.value())));
             }
             case CLICK -> {
                 zs.add(

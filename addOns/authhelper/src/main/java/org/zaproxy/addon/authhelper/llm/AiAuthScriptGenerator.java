@@ -29,7 +29,11 @@ import dev.langchain4j.model.chat.response.ChatResponse;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import java.util.Map;
+import java.util.Objects;
+import java.util.function.Supplier;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.By;
@@ -55,8 +59,10 @@ import org.zaproxy.addon.llm.ui.LlmChatTabPanel;
  * </ol>
  *
  * <p>Credentials are passed to the LLM as placeholder tokens ({@link
- * AiAuthTurnPayload#USERNAME_PLACEHOLDER}, {@link AiAuthTurnPayload#PASSWORD_PLACEHOLDER}). Real
- * values are substituted just before executing each action so they are never sent to the LLM.
+ * AiAuthTurnPayload#USERNAME_PLACEHOLDER}, {@link AiAuthTurnPayload#PASSWORD_PLACEHOLDER}, {@link
+ * AiAuthTurnPayload#TOTP_PLACEHOLDER} and the per digit {@link
+ * AiAuthTurnPayload#totpDigitPlaceholder(int)}). Real values are substituted just before executing
+ * each action so they are never sent to the LLM, see {@link AiAuthCredentials}.
  */
 public class AiAuthScriptGenerator {
 
@@ -90,6 +96,28 @@ public class AiAuthScriptGenerator {
     static final String PAGE_ELEMENTS_JS =
             """
             var els = [];
+            function cssPath(el) {
+              if (el.id) return '#' + CSS.escape(el.id);
+              var parts = [];
+              var cur = el;
+              while (cur && cur.nodeType === 1) {
+                if (cur.id) { parts.unshift('#' + CSS.escape(cur.id)); break; }
+                var tag = cur.tagName.toLowerCase();
+                if (tag === 'html') break;
+                var sel = tag;
+                var parent = cur.parentElement;
+                if (parent && tag !== 'body') {
+                  var sibs = Array.prototype.filter.call(parent.children, function(c) {
+                    return c.tagName === cur.tagName;
+                  });
+                  if (sibs.length > 1) sel += ':nth-of-type(' + (sibs.indexOf(cur) + 1) + ')';
+                }
+                parts.unshift(sel);
+                if (tag === 'body') break;
+                cur = parent;
+              }
+              return parts.join(' > ');
+            }
             document.querySelectorAll('input, select, textarea, button').forEach(function(el) {
               var label = null;
               if (el.type === 'hidden' || el.offsetParent === null || el.hidden) {
@@ -113,6 +141,9 @@ public class AiAuthScriptGenerator {
               if (el.tagName === 'SELECT') {
                 opts = Array.from(el.options).map(function(o) { return o.text.trim(); });
               }
+              var maxLength = parseInt(el.getAttribute('maxlength'), 10);
+              var path = null;
+              try { path = cssPath(el); } catch(e) {}
               els.push({
                 tag: el.tagName.toLowerCase(),
                 type: el.getAttribute('type') || null,
@@ -122,7 +153,11 @@ public class AiAuthScriptGenerator {
                 placeholder: el.placeholder || null,
                 value: el.value || null,
                 options: opts,
-                visible: el.offsetParent !== null && !el.hidden
+                visible: el.offsetParent !== null && !el.hidden,
+                maxLength: isNaN(maxLength) || maxLength < 0 ? null : maxLength,
+                inputMode: el.getAttribute('inputmode') || null,
+                autocomplete: el.getAttribute('autocomplete') || null,
+                cssPath: path
               });
             });
             return JSON.stringify(els);
@@ -137,9 +172,16 @@ public class AiAuthScriptGenerator {
               url             - the current page URL
               pageTitle       - the page <title>
               inputElements   - an array of visible form elements on the page; each has:
-                                  tag, type, id, name, label, placeholder, value, options, visible
+                                  tag, type, id, name, label, placeholder, value, options, visible,
+                                  maxLength, inputMode, autocomplete, cssPath
               previousActions - the actions you requested last turn and whether each succeeded
-              credentials     - always {"username":"{{username}}","password":"{{password}}"}
+              completedActions - all the actions successfully performed since the start of the flow,
+                                in order, including those of earlier turns
+              credentials     - {"username":"{{username}}","password":"{{password}}"} plus
+                                "totp":"{{totp}}" when the user has a TOTP (authenticator app)
+                                second factor configured
+              totpDigits      - the number of digits in the TOTP code, only present when
+                                credentials has "totp"
               visibleText     - visible headings, labels and link text on the page (first 500 chars)
               userHint        - optional free-text guidance from the human operator
 
@@ -172,13 +214,31 @@ public class AiAuthScriptGenerator {
               this step have been filled.
             - selectors[0] MUST be built only from attribute values that are actually present (non-null)
               on that element in inputElements: use "#<id>" when "id" is non-null, otherwise
-              "[name='<name>']" when "name" is non-null, otherwise a tag/class-based selector. Never
-              fabricate a selector using an attribute (id, name, etc.) that is null for that element.
-              Additional selectors, if any, are fallbacks ordered from most- to least-specific.
+              "[name='<name>']" when "name" is non-null, otherwise the element's "cssPath" exactly as
+              given. Never fabricate a selector using an attribute (id, name, etc.) that is null for
+              that element. Additional selectors, if any, are fallbacks ordered from most- to
+              least-specific.
+            - TOTP / one-time codes: when credentials has "totp" and the page asks for a verification,
+              one-time, authenticator or 2FA code, fill it in this turn and continue - do NOT report
+              MFA_REQUIRED. Never type the password into a code field or the code into the password
+              field.
+                * One code field: SEND_KEYS with value "{{totp}}".
+                * One box per digit (several inputs with maxLength 1, often inputMode "numeric" or
+                  autocomplete "one-time-code", and their count equals totpDigits): add one SEND_KEYS
+                  per box in page order with values "{{totp1}}", "{{totp2}}", ... "{{totpN}}" where N
+                  is totpDigits, then CLICK the verify/continue button in the same turn.
+              Never guess or invent a code. A previous "{{totp}}" that was rejected means the field or
+              the flow was wrong, not the code; do not retry the identical actions.
+            - Set state MFA_REQUIRED only when a second factor is requested that cannot be completed:
+              there is no "totp" in credentials, or the factor is not a code entry (push
+              notification, SMS/email code, security key).
             - "actions" must be [] and "successIndicator" must be non-null when state is SUCCESS.
             - "actions" must be [] and "successIndicator" must be null for all other terminal states.
             - Set state SUCCESS only when you are confident the browser shows a post-login page
               (URL changed away from the login page, a greeting is visible, a dashboard loaded, etc.).
+              A page that greets the user, says they are logged in, or offers a log out / sign out
+              link IS the post-login page: report SUCCESS with no actions. Never click a log out /
+              sign out / log off element, that would undo the login.
             - Set state FAILURE if credentials are rejected or a dead end is reached.
             - Compare this turn's url, inputElements and visibleText with the previous turn's. If they
               are unchanged even though previousActions reported success, that action did not actually
@@ -189,6 +249,10 @@ public class AiAuthScriptGenerator {
               Do not respond to a selector-matching failure by changing field values instead.
             - Follow any instructions in the userHint field — they describe non-obvious steps
               (e.g. "set the domain dropdown to Project1") that are required for login to succeed.
+            - You have no memory of earlier turns: completedActions is the record of what you have
+              already done. Treat an instruction of the userHint as done once completedActions shows
+              it (e.g. a SELECT of "Project1"), do not try to repeat it, and do not keep the flow
+              IN_PROGRESS for something already completed.
             - Respond with JSON only. Do not wrap the response in a code block.
             """;
 
@@ -197,15 +261,38 @@ public class AiAuthScriptGenerator {
     private final ObjectMapper mapper;
     private final LlmChatTabPanel chatTab;
     private final List<AiAuthActionResult> successfulActions = new ArrayList<>();
+    private final List<TurnStart> turnStarts = new ArrayList<>();
+    private final Supplier<String> totpCodeSupplier;
+
+    /** The state of the page at the start of a turn and how many actions were recorded by then. */
+    private record TurnStart(int step, String pageState, int recordedActions) {}
 
     public AiAuthScriptGenerator(
             AiAssistedAuthenticationMethod config,
             LlmCommunicationService llm,
             LlmChatTabPanel chatTab) {
+        this(config, llm, chatTab, null);
+    }
+
+    /**
+     * Constructs the generator with a source of TOTP codes.
+     *
+     * @param config the method configuration.
+     * @param llm the LLM service.
+     * @param chatTab the chat tab to log to, might be {@code null}.
+     * @param totpCodeSupplier supplies the current TOTP code of the user, or {@code null} when the
+     *     user has no TOTP data; the supplier itself might be {@code null}.
+     */
+    public AiAuthScriptGenerator(
+            AiAssistedAuthenticationMethod config,
+            LlmCommunicationService llm,
+            LlmChatTabPanel chatTab,
+            Supplier<String> totpCodeSupplier) {
         this.config = config;
         this.llm = llm;
         this.mapper = new ObjectMapper();
         this.chatTab = chatTab;
+        this.totpCodeSupplier = totpCodeSupplier;
     }
 
     /**
@@ -227,14 +314,15 @@ public class AiAuthScriptGenerator {
         List<AiAuthActionResult> previousActions = new ArrayList<>();
 
         for (int step = 1; step <= MAX_TURNS; step++) {
-            List<AiAuthInputElement> elements =
-                    maskCredentialValues(extractPageElements(wd), username, password);
+            AiAuthCredentials credentials = createCredentials(username, password);
+            List<AiAuthInputElement> elements = credentials.mask(extractPageElements(wd));
             String currentUrl = wd.getCurrentUrl();
             String pageTitle = wd.getTitle();
             String visibleText = extractVisibleText(wd);
             LOGGER.debug("Turn {}: url={}, elements={}", step, currentUrl, elements.size());
 
-            logTurnContext(step, currentUrl, pageTitle, elements, visibleText);
+            logTurnContext(step, currentUrl, pageTitle, elements, visibleText, credentials);
+            discardActionsIfPageSeen(step, getPageState(currentUrl, elements));
 
             AiAuthTurnPayload payload =
                     new AiAuthTurnPayload(
@@ -243,11 +331,11 @@ public class AiAuthScriptGenerator {
                             pageTitle,
                             elements,
                             previousActions,
-                            Map.of(
-                                    "username", AiAuthTurnPayload.USERNAME_PLACEHOLDER,
-                                    "password", AiAuthTurnPayload.PASSWORD_PLACEHOLDER),
+                            getSuccessfulActions(),
+                            credentials.toPlaceholders(),
                             config.getHint(),
-                            visibleText);
+                            visibleText,
+                            credentials.totpDigits());
 
             AiAuthResponse response = askLlm(payload);
             if (response == null) {
@@ -269,6 +357,11 @@ public class AiAuthScriptGenerator {
             if (response.isTerminal()) {
                 boolean success = response.state() == AiAuthState.SUCCESS;
                 LOGGER.info("AI auth loop finished: success={}", success);
+                if (response.state() == AiAuthState.MFA_REQUIRED && !credentials.hasTotp()) {
+                    reportLlmError(
+                            Constant.messages.getString(
+                                    "authhelper.auth.method.ai.chat.mfa.nototp"));
+                }
                 AiAuthResult result =
                         new AiAuthResult(
                                 success,
@@ -281,10 +374,13 @@ public class AiAuthScriptGenerator {
                 return result;
             }
 
+            // The LLM might have taken a while to answer, so type a fresh TOTP code.
+            AiAuthCredentials actionCredentials =
+                    credentials.hasTotp() ? createCredentials(username, password) : credentials;
             previousActions = new ArrayList<>();
             for (AiAuthAction action :
                     response.actions() != null ? response.actions() : List.<AiAuthAction>of()) {
-                AiAuthActionResult result = executeAction(wd, action, username, password);
+                AiAuthActionResult result = executeAction(wd, action, actionCredentials);
                 LOGGER.debug(
                         "Action {}: selector={}, success={}",
                         action.type(),
@@ -307,9 +403,71 @@ public class AiAuthScriptGenerator {
         return maxTurns;
     }
 
-    /** Returns all successfully-executed actions, in order, for Zest script generation. */
+    /**
+     * Returns the successfully-executed actions which led to the current page, in order, for Zest
+     * script generation.
+     */
     List<AiAuthActionResult> getSuccessfulActions() {
         return Collections.unmodifiableList(successfulActions);
+    }
+
+    /** The URL and the visible elements identify the state of the page. */
+    private static String getPageState(String url, List<AiAuthInputElement> elements) {
+        return elements.stream()
+                .filter(AiAuthInputElement::visible)
+                .map(e -> String.join("|", e.tag(), e.type(), e.id(), e.name(), e.cssPath()))
+                .collect(Collectors.joining(";", url + "\n", ""));
+    }
+
+    /**
+     * Discards the actions recorded since the flow was last at the same page state, as the flow
+     * went back on itself (for example the login page shown again after a rejected code), the
+     * actions which do work are the ones recorded from now on.
+     */
+    private void discardActionsIfPageSeen(int step, String pageState) {
+        for (int i = 0; i < turnStarts.size(); i++) {
+            TurnStart seen = turnStarts.get(i);
+            if (!seen.pageState().equals(pageState)) {
+                continue;
+            }
+            int discarded = successfulActions.size() - seen.recordedActions();
+            if (discarded > 0) {
+                LOGGER.info(
+                        "Turn {}: the page is back to the state of turn {}, discarding {} recorded action(s)",
+                        step,
+                        seen.step(),
+                        discarded);
+                if (chatTab != null) {
+                    chatTab.appendToOutput(
+                            LlmChatTabPanel.USER_LABEL,
+                            Constant.messages.getString(
+                                    "authhelper.auth.method.ai.chat.discarded",
+                                    seen.step(),
+                                    discarded));
+                }
+                successfulActions.subList(seen.recordedActions(), successfulActions.size()).clear();
+            }
+            turnStarts.subList(i, turnStarts.size()).clear();
+            break;
+        }
+        turnStarts.add(new TurnStart(step, pageState, successfulActions.size()));
+    }
+
+    /**
+     * Creates the credentials, resolving the TOTP code (if any) once so that all the digits typed
+     * come from the same code. Called at the start of a turn and again before typing, so the code
+     * is fresh.
+     */
+    AiAuthCredentials createCredentials(String username, String password) {
+        String totpCode = null;
+        if (totpCodeSupplier != null) {
+            try {
+                totpCode = totpCodeSupplier.get();
+            } catch (Exception e) {
+                LOGGER.warn("Failed to obtain the TOTP code: {}", e.getMessage());
+            }
+        }
+        return new AiAuthCredentials(username, password, totpCode);
     }
 
     // ─── Page extraction ──────────────────────────────────────────────────────
@@ -336,45 +494,6 @@ public class AiAuthScriptGenerator {
         }
     }
 
-    /**
-     * Replaces any real credential value found in extracted page elements with its placeholder
-     * token, so a value typed via {@code SEND_KEYS} is never read back off the DOM and sent to the
-     * LLM on a later turn. Leaves genuinely empty fields untouched, so the LLM can still tell that
-     * they haven't been filled in yet.
-     */
-    List<AiAuthInputElement> maskCredentialValues(
-            List<AiAuthInputElement> elements, String username, String password) {
-        return elements.stream().map(e -> maskCredentialValue(e, username, password)).toList();
-    }
-
-    private AiAuthInputElement maskCredentialValue(
-            AiAuthInputElement element, String username, String password) {
-        String value = element.value();
-        if (value == null || value.isEmpty()) {
-            return element;
-        }
-        if ("password".equals(element.type()) || value.equals(password)) {
-            return withValue(element, AiAuthTurnPayload.PASSWORD_PLACEHOLDER);
-        }
-        if (value.equals(username)) {
-            return withValue(element, AiAuthTurnPayload.USERNAME_PLACEHOLDER);
-        }
-        return element;
-    }
-
-    private static AiAuthInputElement withValue(AiAuthInputElement element, String value) {
-        return new AiAuthInputElement(
-                element.tag(),
-                element.type(),
-                element.id(),
-                element.name(),
-                element.label(),
-                element.placeholder(),
-                value,
-                element.options(),
-                element.visible());
-    }
-
     // ─── LLM turn ─────────────────────────────────────────────────────────────
 
     AiAuthResponse askLlm(AiAuthTurnPayload payload) {
@@ -388,7 +507,8 @@ public class AiAuthScriptGenerator {
                                     UserMessage.from(payloadJson))
                             .responseFormat(ResponseFormat.JSON)
                             .build();
-            response = llm.chat(request);
+            // Each turn is self-contained, the history would just use up the context window.
+            response = llm.chatWithoutMemory(request);
         } catch (Exception e) {
             LOGGER.error("LLM call failed: {}", e.getMessage(), e);
             reportLlmError(
@@ -422,7 +542,7 @@ public class AiAuthScriptGenerator {
     // ─── Action execution ─────────────────────────────────────────────────────
 
     AiAuthActionResult executeAction(
-            WebDriver wd, AiAuthAction action, String username, String password) {
+            WebDriver wd, AiAuthAction action, AiAuthCredentials credentials) {
         AiAuthActionType type = action.type();
 
         if (type == AiAuthActionType.WAIT) {
@@ -453,6 +573,14 @@ public class AiAuthScriptGenerator {
 
         return switch (type) {
             case CLICK -> {
+                if (isLogoutElement(element)) {
+                    yield AiAuthActionResult.failed(
+                            type,
+                            "Refused to click "
+                                    + usedSelector
+                                    + ", it logs out and would undo the login. If the page shows that"
+                                    + " the user is logged in report SUCCESS instead.");
+                }
                 try {
                     element.click();
                     yield AiAuthActionResult.ok(type, usedSelector, null);
@@ -462,7 +590,7 @@ public class AiAuthScriptGenerator {
             }
             case SEND_KEYS -> {
                 try {
-                    String value = substituteCredentials(action.value(), username, password);
+                    String value = credentials.substitute(action.value());
                     element.clear();
                     element.sendKeys(value);
                     yield AiAuthActionResult.ok(type, usedSelector, action.value());
@@ -484,6 +612,25 @@ public class AiAuthScriptGenerator {
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
+    /** Matches the text and attributes of elements that log out, e.g. "Log out" or "#signout". */
+    private static final Pattern LOGOUT =
+            Pattern.compile("(?i)\\b(?:log|sign)[\\s_-]*(?:out|off)\\b");
+
+    /**
+     * Tells whether or not the given element logs out, which an LLM might click when it fails to
+     * recognise the post-login page, undoing the login.
+     */
+    static boolean isLogoutElement(WebElement element) {
+        return Stream.of(
+                        element.getText(),
+                        element.getAttribute("id"),
+                        element.getAttribute("name"),
+                        element.getAttribute("value"),
+                        element.getAttribute("href"))
+                .filter(Objects::nonNull)
+                .anyMatch(text -> LOGOUT.matcher(text).find());
+    }
+
     /** A selector that matched an element, paired with the element it matched. */
     private record SelectorMatch(String selector, WebElement element) {}
 
@@ -502,12 +649,6 @@ public class AiAuthScriptGenerator {
         return null;
     }
 
-    private String substituteCredentials(String value, String username, String password) {
-        if (value == null) return null;
-        return value.replace(AiAuthTurnPayload.USERNAME_PLACEHOLDER, username)
-                .replace(AiAuthTurnPayload.PASSWORD_PLACEHOLDER, password);
-    }
-
     // ─── Chat-tab logging ─────────────────────────────────────────────────────
 
     private void logTurnContext(
@@ -515,7 +656,8 @@ public class AiAuthScriptGenerator {
             String url,
             String pageTitle,
             List<AiAuthInputElement> elements,
-            String visibleText) {
+            String visibleText,
+            AiAuthCredentials credentials) {
         if (chatTab == null) return;
         long visible = elements.stream().filter(AiAuthInputElement::visible).count();
         StringBuilder msg = new StringBuilder();
@@ -536,6 +678,18 @@ public class AiAuthScriptGenerator {
                             Constant.messages.getString(
                                     "authhelper.auth.method.ai.chat.text", visibleText));
         }
+        if (credentials.hasTotp()) {
+            msg.append('\n')
+                    .append(
+                            Constant.messages.getString(
+                                    "authhelper.auth.method.ai.chat.totp",
+                                    credentials.totpDigits()));
+        }
+        msg.append('\n')
+                .append(
+                        Constant.messages.getString(
+                                "authhelper.auth.method.ai.chat.completed",
+                                successfulActions.size()));
         chatTab.appendToOutput(LlmChatTabPanel.USER_LABEL, msg.toString());
     }
 

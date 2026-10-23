@@ -34,7 +34,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import javax.swing.BorderFactory;
 import javax.swing.Icon;
@@ -62,6 +61,7 @@ import org.zaproxy.addon.authhelper.ClientScriptBasedAuthenticationMethodType.Cl
 import org.zaproxy.addon.authhelper.internal.AuthenticationBrowserHook;
 import org.zaproxy.addon.authhelper.internal.AuthenticationStep;
 import org.zaproxy.addon.authhelper.internal.StepsPanel;
+import org.zaproxy.addon.authhelper.internal.TotpFieldsPanel;
 import org.zaproxy.addon.commonlib.internal.TotpSupport;
 import org.zaproxy.addon.pscan.ExtensionPassiveScan2;
 import org.zaproxy.zap.ZAP;
@@ -121,6 +121,7 @@ public class AuthTestDialog extends StandardFieldsDialog {
     private static final String DOMAINS_LABEL = "authhelper.auth.test.dialog.label.domains";
     private static final String COPY_LABEL = "authhelper.auth.test.dialog.label.copy";
     private static final String HINT_LABEL = "authhelper.auth.test.dialog.label.hint";
+    private static final String TOTP_LABEL = "authhelper.auth.test.dialog.label.totp";
 
     private static final String FOUND_STR =
             Constant.messages.getString("authhelper.auth.test.dialog.results.found");
@@ -168,6 +169,7 @@ public class AuthTestDialog extends StandardFieldsDialog {
     private BrowsersComboBoxModel browserComboModel;
     private JPanel hintPanel;
     private JTextArea hintArea;
+    private TotpFieldsPanel totpPanel;
     private JLabel bottomPadding;
 
     private ExtensionAuthhelper ext;
@@ -279,6 +281,12 @@ public class AuthTestDialog extends StandardFieldsDialog {
         hintPanel.setVisible(false);
         this.addCustomComponent(0, HINT_LABEL, hintPanel, 1.0d);
 
+        if (TotpSupport.isTotpInCore()) {
+            totpPanel = new TotpFieldsPanel();
+            totpPanel.setVisible(false);
+            this.addCustomComponent(0, TOTP_LABEL, totpPanel);
+        }
+
         this.addCheckBoxField(0, RECORD_DIAGNOSTICS_LABEL, params.isRecordDiagnostics());
         this.addCustomComponent(0, getResultsPanel());
 
@@ -386,6 +394,9 @@ public class AuthTestDialog extends StandardFieldsDialog {
         setFieldRowVisible(this.getField(STEP_DELAY_LABEL), !isAiAuth);
         if (hintPanel != null) {
             setFieldRowVisible(hintPanel, isAiAuth);
+        }
+        if (totpPanel != null) {
+            setFieldRowVisible(totpPanel, isAiAuth);
         }
         if (bottomPadding != null) {
             Container parent = bottomPadding.getParent();
@@ -694,6 +705,9 @@ public class AuthTestDialog extends StandardFieldsDialog {
                 UsernamePasswordAuthenticationCredentials upCreds =
                         TotpSupport.createUsernamePasswordAuthenticationCredentials(
                                 am, username, password);
+                if (totpPanel != null && totpPanel.hasSecret()) {
+                    setTotp(totpPanel.getTotpData(), upCreds);
+                }
                 user.setAuthenticationCredentials(upCreds);
 
             } else {
@@ -876,25 +890,24 @@ public class AuthTestDialog extends StandardFieldsDialog {
 
     private static void setTotp(
             List<AuthenticationStep> steps, UsernamePasswordAuthenticationCredentials credentials) {
+        steps.stream()
+                .filter(e -> e.getType() == AuthenticationStep.Type.TOTP_FIELD)
+                .findFirst()
+                .map(
+                        step ->
+                                new TotpSupport.TotpData(
+                                        step.getTotpSecret(),
+                                        step.getTotpPeriod(),
+                                        step.getTotpDigits(),
+                                        step.getTotpAlgorithm()))
+                .ifPresent(totpData -> setTotp(totpData, credentials));
+    }
+
+    private static void setTotp(
+            TotpSupport.TotpData totpData, UsernamePasswordAuthenticationCredentials credentials) {
         if (!TotpSupport.isTotpInCore()) {
             return;
         }
-
-        Optional<AuthenticationStep> optStep =
-                steps.stream()
-                        .filter(e -> e.getType() == AuthenticationStep.Type.TOTP_FIELD)
-                        .findFirst();
-        if (optStep.isEmpty()) {
-            return;
-        }
-
-        AuthenticationStep totpStep = optStep.get();
-        TotpSupport.TotpData totpData =
-                new TotpSupport.TotpData(
-                        totpStep.getTotpSecret(),
-                        totpStep.getTotpPeriod(),
-                        totpStep.getTotpDigits(),
-                        totpStep.getTotpAlgorithm());
         TotpSupport.setTotpData(totpData, credentials);
     }
 
@@ -945,6 +958,9 @@ public class AuthTestDialog extends StandardFieldsDialog {
                         browserComboModel.setSelectedBrowser(AuthhelperParam.DEFAULT_BROWSER);
                         setFieldValue(RECORD_DIAGNOSTICS_LABEL, false);
                         hintArea.setText("");
+                        if (totpPanel != null) {
+                            totpPanel.reset();
+                        }
                         stepsPanel.getSteps().forEach(step -> step.setEnabled(false));
 
                         resetResultsPanel();

@@ -61,6 +61,11 @@ The number of seconds to wait after submitting the login form before closing the
 If the browser is closed before the application has loaded then ZAP may not be able to identify
 the session handling or find a suitable verification URL.
 
+<H3>TOTP</H3>
+The TOTP data (secret or fixed code, period, digits and algorithm) of the user, only shown if you have selected the "AI Assisted" Auth
+Method, see <a href="ai-auth.html">AI Assisted Authentication</a> for more details. For "Browser Based" the TOTP data is defined in a
+"Fill TOTP Field" step instead.
+
 <H3>Step Delay (seconds)</H3>
 
 The number of seconds to wait in-between each step, either the implicit steps (filling in the username field, then password, then submitting),

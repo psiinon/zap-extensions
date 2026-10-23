@@ -5,12 +5,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## Unreleased
 ### Added
-- AI Assisted Authentication
+- AI Assisted Authentication, including TOTP second factors, whether entered in one field or one field per digit.
+- `FIXED` TOTP algorithm, for applications that accept a static code (e.g. `1234`), the code is set as the secret.
 - Record requests whose sending failed (for example DNS failure) in the diagnostics, with a synthetic response describing the failure reason, when the network add-on supports it.
 
 ### Changed
 - The Authentication Tester dialog now remembers the last authentication method used and selects it by default next time it's opened.
-
 ### Fixed
 - Handle cookies without a value in Header Based Session Management.
 

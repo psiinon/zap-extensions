@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<title>ZAP Test Server</title>
+	<link href="/tutorial.css" rel="stylesheet" type="text/css" />
+</head>
+<body>
+<div class="roundContainer">
+	<h1>Multi-Step Authentication</h1>
+	<h2>TOTP Step Configuration</h2>
+	<p>Configures the optional 4th login step of the <a href="index.html">multi-step login</a>, the current configuration
+	is returned as JSON (a GET of <a href="config">config</a> just returns it).</p>
+	<p>The configuration is only changed if <strong>Confirm</strong> is changed from <code>no</code> to <code>yes</code>,
+	so that crawlers submitting the form with its default values do not change it.</p>
+
+	<form action="config" method="post">
+	<table style="border: none;">
+	<tr>
+		<td>TOTP:</td>
+		<td><select id="totp" name="totp">
+			<option value="off">Off</option>
+			<option value="fixed">Fixed code</option>
+			<option value="secret">Shared secret</option>
+		</select></td>
+	</tr>
+	<tr>
+		<td>Layout:</td>
+		<td><select id="layout" name="layout">
+			<option value="single">Single field</option>
+			<option value="digits">One field per digit</option>
+		</select></td>
+	</tr>
+	<tr>
+		<td>Fixed code:</td>
+		<td><input id="code" name="code" type="text" value="1234"></td>
+	</tr>
+	<tr>
+		<td>Shared secret:</td>
+		<td><input id="secret" name="secret" type="text" value="JBSWY3DPEHPK3PXP"></td>
+	</tr>
+	<tr>
+		<td>Digits:</td>
+		<td><input id="digits" name="digits" type="number" value="6" min="4" max="10"></td>
+	</tr>
+	<tr>
+		<td>Confirm:</td>
+		<td><input id="confirm" name="confirm" type="text" value="no"> (change to <code>yes</code>)</td>
+	</tr>
+	<tr>
+		<td></td>
+		<td><button id="apply" type="submit">Apply</button></td>
+	</tr>
+	</table>
+	</form>
+</div>
+</body>
+</html>

@@ -11,8 +11,9 @@ AI Assisted Authentication
 This <a href="authhelper.html">add-on</a> adds a new authentication method which uses an LLM to drive a browser and login to the target website.
 <p>
 Unlike <a href="browser-auth.html">Browser Based Authentication</a>, which relies on heuristics to find the username and password fields, this method
-sends the LLM a description of the current page (URL, title, visible text and form elements) at each step and asks it to decide what to click, type
-or select next, repeating until it detects that login has succeeded or failed (or a maximum number of turns is reached).
+sends the LLM a description of the current page (URL, title, visible text and form elements) at each step, along with the actions performed
+so far, and asks it to decide what to click, type or select next, repeating until it detects that login has succeeded or failed (or a maximum
+number of turns is reached).
 <p>
 The <b>LLM Support</b> add-on must be installed and configured with a working provider, since it is used to drive the login flow.
 
@@ -25,16 +26,43 @@ dropdown, or dismissing a cookie banner in a particular way. A free-text "Hints"
       Set the domain dropdown to Project1 before clicking Next.
 </pre>
 
+<H2>TOTP Second Factor</H2>
+
+Login flows that ask for a one-time code from an authenticator app (TOTP) are supported. The TOTP data is defined under the user's
+credentials, in the same way as for <a href="browser-auth.html">Browser Based Authentication</a>: in the desktop the user dialog has a
+"TOTP" tab, in the <a href="auth-tester.html">Authentication Tester</a> the "TOTP" fields are shown when this method is selected, and in
+the Automation Framework and the API the usual <code>totp</code> parameters are used (see below).
+<p>
+The user can supply either:
+<ul>
+<li>the <b>shared secret</b>, in which case a fresh code is generated whenever one is needed, or
+<li>a <b>fixed code</b> (for example <code>1234</code>, as accepted by some test and demo applications), by setting the code as the
+secret and the algorithm to <code>FIXED</code>.
+</ul>
+<p>
+The LLM is told that a TOTP code is available (and how many digits it has) but never the code itself: like the username and password it
+only ever sees placeholders which ZAP replaces when performing the actions. The code can be entered either in a single field or in
+pages that use one input box per digit - in the latter case the LLM fills each box in turn.
+<p>
+If a second factor is requested but the user has no TOTP data the LLM reports <code>MFA_REQUIRED</code> and the authentication stops.
+Other kinds of second factors (push notifications, SMS or email codes, security keys) are not supported.
+
 <H2>Converting to Client Script Authentication</H2>
 
 Running the LLM to drive a browser on every authentication attempt would be slow and unreliable (since it depends on a third-party service).
 Instead, this method is only intended to be used once to work out how to login to a given page: while it drives the browser it records every
-successful action, and on success it automatically builds a Zest script from those actions and switches the context to use
+successful action (discarding those recorded before the flow went back to an earlier page, for example when a one-time code was rejected),
+and on success it automatically builds a Zest script from those actions and switches the context to use
 <a href="client-script.html">Client Script Authentication</a> with that script - which is then used for all subsequent (much faster and
 deterministic) authentication attempts.
 <p>
 If a script with the same name already exists (for example because AI Assisted Authentication was run before against the same login page) it is
 replaced.
+<p>
+When a TOTP code was entered the generated script references the <code>{{TOTP}}</code> variable (or <code>{{TOTP_1}}</code>,
+<code>{{TOTP_2}}</code>, ... for one input per digit), which is resolved from the user's credentials each time the script is run
+to authenticate, so the code is always current even when re-authentication happens much later. The variables are also parameters of
+the script, so it can be run manually ("Run with Params") by providing the current code.
 
 <H2>Automation Framework</H2>
 
@@ -55,6 +83,11 @@ As with <a href="browser-auth.html">Browser Based Authentication</a>, credential
       credentials:
         username: …
         password: …
+        totp:                     # Optional, only needed if the login flow asks for a TOTP code
+          secret:                 # String, the secret, or the code itself for the FIXED algorithm.
+          period:                 # Int, the period. Default: 30
+          digits:                 # Int, the number of digits. Default: 6
+          algorithm:              # String, the algorithm, one of SHA1, SHA256, SHA512, FIXED. Default: SHA1
 </pre>
 
 <p>
@@ -73,6 +106,9 @@ AI Assisted Authentication can also be configured via the ZAP API using the <cod
   <tr><td><code>loginPageWait</code></td><td>No</td><td>The time in seconds to wait after the login page has loaded, default: 5.</td></tr>
   <tr><td><code>hint</code></td><td>No</td><td>The free-text hint described above.</td></tr>
 </table>
+<p>
+The TOTP data of a user is set with the <code>totpSecret</code>, <code>totpPeriod</code>, <code>totpDigits</code> and
+<code>totpAlgorithm</code> parameters of the <code>setAuthenticationCredentials</code> action of the <code>users</code> API.
 
 <p>
 Note that due to restrictions in the core:

@@ -293,6 +293,14 @@ public class LlmCommunicationService {
         return endpointCount;
     }
 
+    /**
+     * Sends the request along with the conversation so far, and remembers the request and the
+     * response for the following requests.
+     *
+     * @param chatRequest the request to send.
+     * @return the response.
+     * @see #chatWithoutMemory(ChatRequest)
+     */
     public ChatResponse chat(ChatRequest chatRequest) {
         chatMemory.add(chatRequest.messages());
         ChatResponse response =
@@ -303,6 +311,18 @@ public class LlmCommunicationService {
                                 .build());
         chatMemory.add(response.aiMessage());
         return response;
+    }
+
+    /**
+     * Sends just the given request, without the conversation so far, and does not remember it. For
+     * self-contained requests, such as the turns of an automated loop, where the history would only
+     * use up the context window of the model.
+     *
+     * @param chatRequest the request to send.
+     * @return the response.
+     */
+    public ChatResponse chatWithoutMemory(ChatRequest chatRequest) {
+        return model.chat(chatRequest);
     }
 
     public String chat(String str) {

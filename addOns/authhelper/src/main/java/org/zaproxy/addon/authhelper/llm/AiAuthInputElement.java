@@ -25,6 +25,11 @@ import java.util.List;
 /**
  * A form element extracted from the current page and included in the LLM turn payload. Gives the
  * LLM enough context to identify each field and generate reliable selectors.
+ *
+ * <p>{@code maxLength}, {@code inputMode} and {@code autocomplete} are the usual signals of
+ * one-time-code inputs (e.g. six {@code maxlength="1"} boxes with {@code inputmode="numeric"} or
+ * {@code autocomplete="one-time-code"}). {@code cssPath} is a structural CSS selector that uniquely
+ * identifies the element even when it has no {@code id} or {@code name}.
  */
 public record AiAuthInputElement(
         @JsonProperty("tag") String tag,
@@ -35,4 +40,37 @@ public record AiAuthInputElement(
         @JsonProperty("placeholder") String placeholder,
         @JsonProperty("value") String value,
         @JsonProperty("options") List<String> options,
-        @JsonProperty("visible") boolean visible) {}
+        @JsonProperty("visible") boolean visible,
+        @JsonProperty("maxLength") Integer maxLength,
+        @JsonProperty("inputMode") String inputMode,
+        @JsonProperty("autocomplete") String autocomplete,
+        @JsonProperty("cssPath") String cssPath) {
+
+    /**
+     * Returns a copy of this element with the given value.
+     *
+     * @param newValue the new value.
+     * @return the copy.
+     */
+    public AiAuthInputElement withValue(String newValue) {
+        return new AiAuthInputElement(
+                tag,
+                type,
+                id,
+                name,
+                label,
+                placeholder,
+                newValue,
+                options,
+                visible,
+                maxLength,
+                inputMode,
+                autocomplete,
+                cssPath);
+    }
+
+    /** Tells whether this element looks like a single-character input, e.g. one OTP digit box. */
+    public boolean isSingleCharacterInput() {
+        return maxLength != null && maxLength == 1;
+    }
+}

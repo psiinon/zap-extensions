@@ -29,7 +29,10 @@ import org.zaproxy.addon.dev.TestPage;
 import org.zaproxy.addon.dev.TestProxyServer;
 import org.zaproxy.addon.network.server.HttpMessageHandlerContext;
 
-/** Validates credentials and domain selection, then issues a session token on success. */
+/**
+ * Validates credentials and domain selection, then issues a session token on success, or redirects
+ * to the TOTP step if that is enabled.
+ */
 public class MultiStepAuthLoginPage extends TestPage {
 
     private static final Logger LOGGER = LogManager.getLogger(MultiStepAuthLoginPage.class);
@@ -78,6 +81,15 @@ public class MultiStepAuthLoginPage extends TestPage {
                 departmentValid);
 
         if (credentialsValid && domainValid && departmentValid) {
+            if (getParent().isTotpEnabled()) {
+                DevUtils.setRedirect(
+                        msg,
+                        "totp?"
+                                + MultiStepAuthTotpPage.PARAM_PENDING
+                                + "="
+                                + getParent().createPendingToken(user));
+                return;
+            }
             String token = getParent().getToken(user);
             DevUtils.setRedirect(msg, "home");
             msg.getResponseHeader().setHeader(HttpHeader.SET_COOKIE, "session=" + token);

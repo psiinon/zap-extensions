@@ -4,6 +4,9 @@
 // The mock LLM, which the rule set provided by this add-on is used with.
 dependencies {
     zapAddOn(project(":addOns:llm:llmTest"))
+
+    // Needed by the TOTP generation of the tested add-on, provided by ZAP at runtime.
+    testRuntimeOnly("commons-codec:commons-codec:1.20.0")
 }
 
 zapAddOn {

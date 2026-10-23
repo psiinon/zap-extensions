@@ -19,19 +19,15 @@
  */
 package org.zaproxy.addon.authhelper;
 
-import com.bastiaanjansen.otp.HMACAlgorithm;
-import com.bastiaanjansen.otp.TOTPGenerator;
 import java.awt.EventQueue;
 import java.awt.event.KeyEvent;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Stream;
 import javax.swing.ImageIcon;
 import lombok.Getter;
 import org.apache.commons.configuration.Configuration;
@@ -52,6 +48,7 @@ import org.parosproxy.paros.model.HistoryReference;
 import org.parosproxy.paros.model.Session;
 import org.parosproxy.paros.network.HttpMessage;
 import org.parosproxy.paros.view.View;
+import org.zaproxy.addon.authhelper.internal.TotpAlgorithms;
 import org.zaproxy.addon.authhelper.internal.db.TableJdo;
 import org.zaproxy.addon.authhelper.internal.ui.diags.AuthDiagsPanel;
 import org.zaproxy.addon.commonlib.internal.TotpSupport;
@@ -135,29 +132,22 @@ public class ExtensionAuthhelper extends ExtensionAdaptor {
 
     @Override
     public void init() {
-        List<String> supportedAlgorithms =
-                Stream.of(HMACAlgorithm.values()).map(HMACAlgorithm::name).toList();
-
         TotpSupport.setTotpGenerator(
                 new TotpGenerator() {
 
                     @Override
                     public List<String> getSupportedAlgorithms() {
-                        return supportedAlgorithms;
+                        return TotpAlgorithms.getSupported();
                     }
 
                     @Override
                     public String generate(TotpData data, Instant when) {
-                        return new TOTPGenerator.Builder(data.secret())
-                                .withHOTPGenerator(
-                                        builder ->
-                                                builder.withAlgorithm(
-                                                                HMACAlgorithm.valueOf(
-                                                                        data.algorithm()))
-                                                        .withPasswordLength(data.digits()))
-                                .withPeriod(Duration.ofSeconds(data.period()))
-                                .build()
-                                .at(when);
+                        return TotpAlgorithms.generate(
+                                data.secret(),
+                                data.period(),
+                                data.digits(),
+                                data.algorithm(),
+                                when);
                     }
                 });
     }

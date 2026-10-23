@@ -20,11 +20,14 @@
 package org.zaproxy.addon.authhelper.llm;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.hasEntry;
+import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.not;
 
 import java.util.List;
 import java.util.stream.Stream;
@@ -32,6 +35,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.zaproxy.zest.core.v1.ZestActionSleep;
 import org.zaproxy.zest.core.v1.ZestClientElementClear;
@@ -74,6 +78,47 @@ class AiAuthZestBuilderUnitTest {
             assertThat(sendKeys.getElement(), is("#user"));
             assertThat(sendKeys.getType(), is("cssSelector"));
             assertThat(sendKeys.getValue(), is("{{username}}"));
+        }
+
+        @Test
+        void shouldMapTotpPlaceholderToZestTotpVariable() {
+            var action = AiAuthActionResult.ok(AiAuthActionType.SEND_KEYS, "#code", "{{totp}}");
+
+            ZestScript zs = buildScript("firefox", List.of(action));
+
+            var sendKeys = (ZestClientElementSendKeys) zs.getStatements().get(3);
+            assertThat(sendKeys.getValue(), is("{{TOTP}}"));
+        }
+
+        @Test
+        void shouldMapTotpDigitPlaceholdersToZestTotpDigitVariables() {
+            var first = AiAuthActionResult.ok(AiAuthActionType.SEND_KEYS, "#d1", "{{totp1}}");
+            var sixth = AiAuthActionResult.ok(AiAuthActionType.SEND_KEYS, "#d6", "{{totp6}}");
+
+            ZestScript zs = buildScript("firefox", List.of(first, sixth));
+
+            assertThat(
+                    ((ZestClientElementSendKeys) zs.getStatements().get(3)).getValue(),
+                    is("{{TOTP_1}}"));
+            assertThat(
+                    ((ZestClientElementSendKeys) zs.getStatements().get(6)).getValue(),
+                    is("{{TOTP_6}}"));
+        }
+
+        @ParameterizedTest
+        @CsvSource(
+                nullValues = "null",
+                value = {
+                    "null, null",
+                    "'', ''",
+                    "{{username}}, {{username}}",
+                    "{{totp}}, {{TOTP}}",
+                    "{{totp12}}, {{TOTP_12}}",
+                    "x{{totp}}y{{totp2}}z, x{{TOTP}}y{{TOTP_2}}z",
+                    "{{totpx}}, {{totpx}}"
+                })
+        void shouldConvertPlaceholdersToZestValues(String value, String expected) {
+            assertThat(AiAuthZestBuilder.toZestValue(value), is(expected));
         }
 
         @Test
@@ -188,6 +233,37 @@ class AiAuthZestBuilderUnitTest {
             var vars = zs.getParameters().getVariablesMap();
             assertThat(vars, hasKey("username"));
             assertThat(vars, hasKey("password"));
+        }
+
+        @Test
+        void shouldAddTotpParametersForTotpVariablesTyped() {
+            ZestScript zs =
+                    buildScript(
+                            "firefox",
+                            List.of(
+                                    AiAuthActionResult.ok(
+                                            AiAuthActionType.SEND_KEYS, "#d10", "{{totp10}}"),
+                                    AiAuthActionResult.ok(
+                                            AiAuthActionType.SEND_KEYS, "#d2", "{{totp2}}"),
+                                    AiAuthActionResult.ok(
+                                            AiAuthActionType.SEND_KEYS, "#d2", "{{totp2}}"),
+                                    AiAuthActionResult.ok(
+                                            AiAuthActionType.SEND_KEYS, "#code", "{{totp}}"),
+                                    AiAuthActionResult.failed(
+                                            AiAuthActionType.SEND_KEYS, "{{totp1}}")));
+
+            assertThat(
+                    zs.getParameters().getVariables().stream().map(v -> v[0]).toList(),
+                    contains("username", "password", "TOTP", "TOTP_2", "TOTP_10"));
+        }
+
+        @Test
+        void shouldNotAddTotpParametersWhenNotTyped() {
+            var action = AiAuthActionResult.ok(AiAuthActionType.SEND_KEYS, "#user", "{{username}}");
+
+            ZestScript zs = buildScript("firefox", List.of(action));
+
+            assertThat(zs.getParameters().getVariablesMap().keySet(), not(hasItem("TOTP")));
         }
 
         @Test

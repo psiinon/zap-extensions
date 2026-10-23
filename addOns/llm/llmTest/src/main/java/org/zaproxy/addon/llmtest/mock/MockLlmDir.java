@@ -156,7 +156,17 @@ public class MockLlmDir extends TestDirectory {
         }
         String model = request.path("model").asText(DEFAULT_MODEL);
         String prompt = getLastUserMessage(request);
-        String reply = getRules(ruleSet).replyFor(prompt);
+        String reply =
+                getRules(ruleSet)
+                        .match(prompt)
+                        .orElseGet(
+                                () -> {
+                                    LOGGER.warn(
+                                            "Mock LLM rule set {} has no rule matching the prompt: {}",
+                                            ruleSet,
+                                            prompt);
+                                    return MockLlmRules.NO_MATCH_REPLY;
+                                });
         LOGGER.debug("Mock LLM prompt: {} reply: {}", prompt, reply);
         setResponse(msg, TestProxyServer.STATUS_OK, buildCompletion(model, prompt, reply));
     }

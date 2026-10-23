@@ -49,6 +49,7 @@ import org.zaproxy.addon.authhelper.AuthMethodOptionsPanelUtils;
 import org.zaproxy.addon.authhelper.AuthUtils;
 import org.zaproxy.addon.authhelper.ClientScriptBasedAuthenticationMethodType;
 import org.zaproxy.addon.authhelper.ClientScriptBasedAuthenticationMethodType.ClientScriptBasedAuthenticationMethod;
+import org.zaproxy.addon.commonlib.internal.TotpSupport;
 import org.zaproxy.addon.llm.ExtensionLlm;
 import org.zaproxy.addon.llm.services.LlmCommunicationService;
 import org.zaproxy.addon.llm.ui.LlmChatTabPanel;
@@ -139,7 +140,7 @@ public class AiAssistedAuthenticationMethodType extends AuthenticationMethodType
 
         @Override
         public AuthenticationCredentials createAuthenticationCredentials() {
-            return new UsernamePasswordAuthenticationCredentials();
+            return TotpSupport.createUsernamePasswordAuthenticationCredentials();
         }
 
         @Override
@@ -235,7 +236,9 @@ public class AiAssistedAuthenticationMethodType extends AuthenticationMethodType
             WebDriver wd = null;
             try {
                 wd = extSel.getProxiedBrowser(browserId);
-                AiAuthScriptGenerator generator = new AiAuthScriptGenerator(this, llm, chatTab);
+                AiAuthScriptGenerator generator =
+                        new AiAuthScriptGenerator(
+                                this, llm, chatTab, () -> TotpSupport.getCode(upCreds));
                 AiAuthResult result =
                         generator.run(wd, upCreds.getUsername(), upCreds.getPassword());
                 if (result.success()) {
@@ -337,9 +340,14 @@ public class AiAssistedAuthenticationMethodType extends AuthenticationMethodType
                 }
 
                 GenericAuthenticationCredentials genericCreds =
-                        new GenericAuthenticationCredentials(new String[] {"username", "password"});
+                        TotpSupport.createGenericAuthenticationCredentials(
+                                new String[] {"username", "password"});
                 genericCreds.setParam("username", upCreds.getUsername());
                 genericCreds.setParam("password", upCreds.getPassword());
+                TotpSupport.TotpData totpData = TotpSupport.getTotpData(upCreds);
+                if (totpData != null) {
+                    TotpSupport.setTotpData(totpData, genericCreds);
+                }
                 user.setAuthenticationCredentials(genericCreds);
 
                 user.getContext().setAuthenticationMethod(clientMethod);
@@ -526,7 +534,7 @@ public class AiAssistedAuthenticationMethodType extends AuthenticationMethodType
 
     @Override
     public UsernamePasswordAuthenticationCredentials createAuthenticationCredentials() {
-        return new UsernamePasswordAuthenticationCredentials();
+        return TotpSupport.createUsernamePasswordAuthenticationCredentials();
     }
 
     @Override

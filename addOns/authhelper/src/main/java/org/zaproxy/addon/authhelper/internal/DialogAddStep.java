@@ -19,7 +19,6 @@
  */
 package org.zaproxy.addon.authhelper.internal;
 
-import com.bastiaanjansen.otp.HMACAlgorithm;
 import java.awt.Dialog;
 import java.util.Comparator;
 import java.util.List;
@@ -430,7 +429,7 @@ class DialogAddStep extends AbstractFormDialog {
     protected JComboBox<String> getTotpAlgorithmComboBox() {
         if (totpAlgorithmComboBox == null) {
             DefaultComboBoxModel<String> model = new DefaultComboBoxModel<>();
-            Stream.of(HMACAlgorithm.values()).map(HMACAlgorithm::name).forEach(model::addElement);
+            TotpAlgorithms.getSupported().forEach(model::addElement);
             totpAlgorithmComboBox = new JComboBox<>(model);
         }
         return totpAlgorithmComboBox;

@@ -5,6 +5,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- Helper to resolve the TOTP variables of authentication scripts, including one variable per digit of the code (e.g. `{{TOTP_1}}`), for pages with one input per digit.
+
 ### Changed
 - Update dependencies.
 - Maintenance changes.

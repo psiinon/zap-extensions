@@ -5,8 +5,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- Support `{{TOTP_1}}`, `{{TOTP_2}}`, ... variables in authentication scripts, resolved to each digit of the TOTP code, for login pages with one input per digit.
+  The TOTP variables can be declared as parameters of the script, to run it manually, without being prompted for them (or treated as credentials) when authenticating.
+
 ### Changed
 - Depend on newer version of Script Console add-on to use its functionality.
+- Depend on newer version of Common Library add-on.
 
 ### Fixed
 - Running a script with parameters no longer blocks the UI.

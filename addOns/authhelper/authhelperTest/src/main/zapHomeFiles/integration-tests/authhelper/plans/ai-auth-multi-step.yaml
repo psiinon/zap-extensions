@@ -32,6 +32,12 @@ env:
     progressToStdout: true
   vars: {}
 jobs:
+  - type: "requestor"
+    name: "configure test app"
+    requests:
+      - url: "http://localhost:9091/auth/multi-step-auth/config?totp=off&confirm=yes"
+        method: "POST"
+        responseCode: 200
   - type: "llm-config"
     name: "llm-config"
     parameters:

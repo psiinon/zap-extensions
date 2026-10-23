@@ -20,9 +20,9 @@
 package org.zaproxy.addon.authhelper.internal;
 
 import com.bastiaanjansen.otp.HMACAlgorithm;
-import com.bastiaanjansen.otp.TOTPGenerator;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -241,14 +241,8 @@ public class AuthenticationStep
         }
 
         // Fallback to data from the step for now.
-        return new TOTPGenerator.Builder(totpSecret)
-                .withHOTPGenerator(
-                        builder ->
-                                builder.withAlgorithm(HMACAlgorithm.valueOf(totpAlgorithm))
-                                        .withPasswordLength(totpDigits))
-                .withPeriod(Duration.ofSeconds(totpPeriod))
-                .build()
-                .now();
+        return TotpAlgorithms.generate(
+                totpSecret, totpPeriod, totpDigits, totpAlgorithm, Instant.now());
     }
 
     private By createtBy() {
@@ -316,9 +310,7 @@ public class AuthenticationStep
                 return ValidationResult.INVALID_TOTP_DIGITS;
             }
 
-            try {
-                HMACAlgorithm.valueOf(newStep.getTotpAlgorithm());
-            } catch (Exception e) {
+            if (!TotpAlgorithms.isSupported(newStep.getTotpAlgorithm())) {
                 return ValidationResult.INVALID_TOTP_ALGORITHM;
             }
         }

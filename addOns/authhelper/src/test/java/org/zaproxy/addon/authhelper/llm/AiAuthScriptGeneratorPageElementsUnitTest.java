@@ -22,6 +22,7 @@ package org.zaproxy.addon.authhelper.llm;
 import static fi.iki.elonen.NanoHTTPD.newFixedLengthResponse;
 import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.is;
+import static org.hamcrest.CoreMatchers.nullValue;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.mockito.Mockito.mock;
 
@@ -38,6 +39,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestTemplate;
 import org.junit.jupiter.api.extension.RegisterExtension;
+import org.openqa.selenium.By;
 import org.openqa.selenium.WebDriver;
 import org.zaproxy.addon.authhelper.llm.AiAssistedAuthenticationMethodType.AiAssistedAuthenticationMethod;
 import org.zaproxy.addon.llm.services.LlmCommunicationService;
@@ -127,6 +129,58 @@ class AiAuthScriptGeneratorPageElementsUnitTest extends TestUtils {
         // Then
         assertThat(elements.size(), is(equalTo(1)));
         assertThat(elements.get(0).id(), is(equalTo("visible")));
+    }
+
+    @TestTemplate
+    void shouldExtractOtpAttributesAndCssPathForIdlessInputs(WebDriver wd) {
+        // Given
+        pageContent =
+                () ->
+                        """
+                        <form>
+                          <label>Code</label>
+                          <input type="text" maxlength="1" inputmode="numeric" autocomplete="one-time-code" />
+                          <input type="text" maxlength="1" inputmode="numeric" autocomplete="one-time-code" />
+                          <input type="text" maxlength="1" inputmode="numeric" autocomplete="one-time-code" />
+                          <button type="submit">Verify</button>
+                        </form>
+                        """;
+        wd.get(url);
+        // When
+        List<AiAuthInputElement> elements = generator.extractPageElements(wd);
+        // Then
+        assertThat(elements.size(), is(equalTo(4)));
+        for (int i = 0; i < 3; i++) {
+            AiAuthInputElement box = elements.get(i);
+            assertThat(box.maxLength(), is(equalTo(1)));
+            assertThat(box.isSingleCharacterInput(), is(true));
+            assertThat(box.inputMode(), is(equalTo("numeric")));
+            assertThat(box.autocomplete(), is(equalTo("one-time-code")));
+            assertThat(
+                    box.cssPath(), is(equalTo("body > form > input:nth-of-type(" + (i + 1) + ")")));
+            assertThat(wd.findElements(By.cssSelector(box.cssPath())).size(), is(equalTo(1)));
+        }
+        assertThat(elements.get(3).cssPath(), is(equalTo("body > form > button")));
+        assertThat(elements.get(3).maxLength(), is(nullValue()));
+    }
+
+    @TestTemplate
+    void shouldUseIdAsCssPathWhenPresent(WebDriver wd) {
+        // Given
+        pageContent =
+                () ->
+                        """
+                        <div id="login">
+                          <input type="text" id="user" />
+                          <div><input type="password" /></div>
+                        </div>
+                        """;
+        wd.get(url);
+        // When
+        List<AiAuthInputElement> elements = generator.extractPageElements(wd);
+        // Then
+        assertThat(elements.get(0).cssPath(), is(equalTo("#user")));
+        assertThat(elements.get(1).cssPath(), is(equalTo("#login > div > input")));
     }
 
     @TestTemplate

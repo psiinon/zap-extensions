@@ -27,6 +27,7 @@ import org.parosproxy.paros.extension.Extension;
 import org.parosproxy.paros.extension.ExtensionAdaptor;
 import org.parosproxy.paros.extension.ExtensionHook;
 import org.zaproxy.addon.authhelper.AuthUtils;
+import org.zaproxy.addon.authhelper.ExtensionAuthhelper;
 import org.zaproxy.addon.llm.ExtensionLlm;
 import org.zaproxy.zap.extension.authentication.ExtensionAuthentication;
 import org.zaproxy.zap.extension.selenium.ExtensionSelenium;
@@ -36,7 +37,7 @@ public class ExtensionAuthhelperLlm extends ExtensionAdaptor {
     public static final String NAME = "ExtensionAuthhelperLlm";
 
     private static final List<Class<? extends Extension>> DEPENDENCIES =
-            List.of(ExtensionLlm.class, ExtensionSelenium.class);
+            List.of(ExtensionAuthhelper.class, ExtensionLlm.class, ExtensionSelenium.class);
 
     private static final Logger LOGGER = LogManager.getLogger(ExtensionAuthhelperLlm.class);
 

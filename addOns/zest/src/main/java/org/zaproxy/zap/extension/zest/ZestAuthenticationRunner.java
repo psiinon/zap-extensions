@@ -30,7 +30,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.parosproxy.paros.network.HttpHeader;
 import org.parosproxy.paros.network.HttpMessage;
-import org.zaproxy.addon.commonlib.internal.TotpSupport;
+import org.zaproxy.addon.commonlib.internal.TotpVariables;
 import org.zaproxy.addon.network.ExtensionNetwork;
 import org.zaproxy.addon.network.server.HttpMessageHandler;
 import org.zaproxy.addon.network.server.HttpMessageHandlerContext;
@@ -57,8 +57,6 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
 
     private static final Logger LOGGER = LogManager.getLogger(ZestAuthenticationRunner.class);
 
-    private static final String TOTP_VAR_NAME = "TOTP";
-
     private static final String PROXY_ADDRESS = "127.0.0.1";
 
     private static final String OLD_USERNAME = "Username";
@@ -67,7 +65,7 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
     public static final String USERNAME = "username";
     public static final String PASSWORD = "password";
 
-    private final String totpVar;
+    private final TotpVariables totpVariables;
 
     private ZestScriptWrapper script = null;
     private AuthenticationHelper helper;
@@ -79,10 +77,10 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
             ExtensionZest extension, ExtensionNetwork extensionNetwork, ZestScriptWrapper script) {
         super(extension, extensionNetwork, script);
         this.script = script;
-        totpVar =
-                script.getZestScript().getParameters().getTokenStart()
-                        + TOTP_VAR_NAME
-                        + script.getZestScript().getParameters().getTokenEnd();
+        totpVariables =
+                new TotpVariables(
+                        script.getZestScript().getParameters().getTokenStart(),
+                        script.getZestScript().getParameters().getTokenEnd());
         autoCloseProxy = true;
     }
 
@@ -102,7 +100,8 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
         return USERNAME.equals(variableName)
                 || PASSWORD.equals(variableName)
                 || OLD_USERNAME.equals(variableName)
-                || OLD_PASSWORD.equals(variableName);
+                || OLD_PASSWORD.equals(variableName)
+                || TotpVariables.isVariable(variableName);
     }
 
     @Override
@@ -158,6 +157,7 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
             }
 
             copyCredentials(credentials, paramsValues);
+            addTotpParameters(paramsValues);
 
             this.run(script.getZestScript(), paramsValues);
 
@@ -208,6 +208,18 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
     private static void copyValue(
             GenericAuthenticationCredentials credentials, String name, Map<String, String> params) {
         params.put(name, credentials.getParam(name));
+    }
+
+    /**
+     * Adds the TOTP variables declared as parameters of the script (so that it can be run
+     * manually), to not be prompted for them. The actual values are set when running the
+     * statements, from the user's credentials.
+     */
+    private void addTotpParameters(Map<String, String> paramsValues) {
+        script.getZestScript().getParameters().getVariables().stream()
+                .map(vars -> vars[0])
+                .filter(TotpVariables::isVariable)
+                .forEach(name -> paramsValues.putIfAbsent(name, ""));
     }
 
     /**
@@ -262,11 +274,12 @@ public class ZestAuthenticationRunner extends ZestZapRunner implements Authentic
                     IOException,
                     ZestAssignFailException,
                     ZestClientFailException {
-        if (stmt instanceof ZestClientElementSendKeys sendKeys
-                && totpVar.equals(sendKeys.getValue())) {
-            String code =
-                    TotpSupport.getCode(helper.getRequestingUser().getAuthenticationCredentials());
-            setVariable(TOTP_VAR_NAME, code);
+        if (stmt instanceof ZestClientElementSendKeys sendKeys) {
+            totpVariables
+                    .getVariables(
+                            sendKeys.getValue(),
+                            helper.getRequestingUser().getAuthenticationCredentials())
+                    .forEach(this::setVariable);
         }
         return super.runStatement(script, stmt, lastResponse);
     }

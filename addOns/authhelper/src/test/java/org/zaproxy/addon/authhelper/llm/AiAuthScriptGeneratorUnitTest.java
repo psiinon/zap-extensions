@@ -20,24 +20,35 @@
 package org.zaproxy.addon.authhelper.llm;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
-import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import dev.langchain4j.data.message.AiMessage;
+import dev.langchain4j.data.message.UserMessage;
 import dev.langchain4j.model.chat.request.ChatRequest;
 import dev.langchain4j.model.chat.response.ChatResponse;
+import java.util.Arrays;
+import java.util.Iterator;
 import java.util.List;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mockito.ArgumentCaptor;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.WebDriver;
@@ -52,6 +63,10 @@ class AiAuthScriptGeneratorUnitTest {
 
     private static final String USERNAME = "realUser";
     private static final String PASSWORD = "realS3cret";
+    private static final String TOTP_CODE = "483920";
+    private static final AiAuthCredentials CREDS = new AiAuthCredentials(USERNAME, PASSWORD, null);
+    private static final AiAuthCredentials TOTP_CREDS =
+            new AiAuthCredentials(USERNAME, PASSWORD, TOTP_CODE);
 
     private AiAssistedAuthenticationMethod config;
     private LlmCommunicationService llm;
@@ -70,81 +85,44 @@ class AiAuthScriptGeneratorUnitTest {
         generator = new AiAuthScriptGenerator(config, llm, null);
     }
 
-    private static AiAuthInputElement element(String type, String value) {
-        return new AiAuthInputElement(
-                "input", type, "id", "name", "label", "placeholder", value, null, true);
-    }
-
     /**
-     * Stubs {@code llm.chat(...)} to return a response whose {@code aiMessage().text()} is json.
+     * Stubs {@code llm.chatWithoutMemory(...)} to return a response whose {@code
+     * aiMessage().text()} is json.
      */
     private void stubLlmResponse(String json) throws Exception {
-        ChatResponse response = mock(ChatResponse.class);
-        AiMessage aiMessage = mock(AiMessage.class);
-        given(response.aiMessage()).willReturn(aiMessage);
-        given(aiMessage.text()).willReturn(json);
-        given(llm.chat(any(ChatRequest.class))).willReturn(response);
+        stubLlmResponses(json);
     }
 
-    @Nested
-    class MaskCredentialValues {
-
-        @Test
-        void shouldMaskFilledPasswordTypeField() {
-            List<AiAuthInputElement> masked =
-                    generator.maskCredentialValues(
-                            List.of(element("password", PASSWORD)), USERNAME, PASSWORD);
-
-            assertThat(masked.get(0).value(), is(equalTo(AiAuthTurnPayload.PASSWORD_PLACEHOLDER)));
-        }
-
-        @Test
-        void shouldNotMaskEmptyPasswordTypeField() {
-            // An empty password field must stay empty, so the LLM can tell it still needs filling
-            // in rather than believing it already contains a (masked) value.
-            List<AiAuthInputElement> masked =
-                    generator.maskCredentialValues(
-                            List.of(element("password", "")), USERNAME, PASSWORD);
-
-            assertThat(masked.get(0).value(), is(equalTo("")));
-        }
-
-        @Test
-        void shouldMaskTextFieldValueEqualToRealUsername() {
-            List<AiAuthInputElement> masked =
-                    generator.maskCredentialValues(
-                            List.of(element("text", USERNAME)), USERNAME, PASSWORD);
-
-            assertThat(masked.get(0).value(), is(equalTo(AiAuthTurnPayload.USERNAME_PLACEHOLDER)));
-        }
-
-        @Test
-        void shouldMaskTextFieldValueEqualToRealPassword() {
-            List<AiAuthInputElement> masked =
-                    generator.maskCredentialValues(
-                            List.of(element("text", PASSWORD)), USERNAME, PASSWORD);
-
-            assertThat(masked.get(0).value(), is(equalTo(AiAuthTurnPayload.PASSWORD_PLACEHOLDER)));
-        }
-
-        @Test
-        void shouldNotMaskUnrelatedFieldValues() {
-            List<AiAuthInputElement> masked =
-                    generator.maskCredentialValues(
-                            List.of(element("text", "Project1")), USERNAME, PASSWORD);
-
-            assertThat(masked.get(0).value(), is(equalTo("Project1")));
-        }
-
-        @Test
-        void shouldNotMaskNullValues() {
-            List<AiAuthInputElement> masked =
-                    generator.maskCredentialValues(
-                            List.of(element("text", null)), USERNAME, PASSWORD);
-
-            assertThat(masked.get(0).value(), nullValue());
-        }
+    /** Stubs {@code llm.chatWithoutMemory(...)} to return the given responses, one per turn. */
+    private void stubLlmResponses(String... jsons) throws Exception {
+        ChatResponse[] responses =
+                Stream.of(jsons)
+                        .map(
+                                json -> {
+                                    ChatResponse response = mock(ChatResponse.class);
+                                    AiMessage aiMessage = mock(AiMessage.class);
+                                    given(response.aiMessage()).willReturn(aiMessage);
+                                    given(aiMessage.text()).willReturn(json);
+                                    return response;
+                                })
+                        .toArray(ChatResponse[]::new);
+        given(llm.chatWithoutMemory(any(ChatRequest.class)))
+                .willReturn(responses[0], Arrays.copyOfRange(responses, 1, responses.length));
     }
+
+    private static String sendKeysTurn(String selector, String value) {
+        return """
+                { "state": "IN_PROGRESS", "reasoning": "fill", "successIndicator": null,
+                  "actions": [ { "type": "SEND_KEYS", "selectors": ["%s"], "value": "%s" } ] }
+                """
+                .formatted(selector, value);
+    }
+
+    private static final String SUCCESS_TURN =
+            """
+            { "state": "SUCCESS", "reasoning": "Logged in", "actions": [],
+              "successIndicator": { "type": "URL_PATTERN", "value": "home" } }
+            """;
 
     @Nested
     class ExecuteAction {
@@ -164,11 +142,38 @@ class AiAuthScriptGeneratorUnitTest {
             AiAuthAction action =
                     new AiAuthAction(AiAuthActionType.CLICK, List.of("#submit"), null);
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             verify(webElement).click();
             assertThat(result.success(), is(true));
             assertThat(result.usedSelector(), is(equalTo("#submit")));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"Log out", "Logout", "Sign-out", "log_off", "/auth/logout?x=1"})
+        void shouldRefuseToClickLogoutElement(String text) {
+            when(wd.findElements(By.cssSelector("#link"))).thenReturn(List.of(webElement));
+            when(webElement.getAttribute("href")).thenReturn(text);
+            AiAuthAction action = new AiAuthAction(AiAuthActionType.CLICK, List.of("#link"), null);
+
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
+
+            verify(webElement, never()).click();
+            assertThat(result.success(), is(false));
+            assertThat(result.error(), containsString("report SUCCESS"));
+        }
+
+        @ParameterizedTest
+        @ValueSource(strings = {"Login", "Sign in", "Log in to Project1", "#logo", "/checkout"})
+        void shouldClickElementNotLoggingOut(String text) {
+            when(wd.findElements(By.cssSelector("#btn"))).thenReturn(List.of(webElement));
+            when(webElement.getText()).thenReturn(text);
+            AiAuthAction action = new AiAuthAction(AiAuthActionType.CLICK, List.of("#btn"), null);
+
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
+
+            verify(webElement).click();
+            assertThat(result.success(), is(true));
         }
 
         @Test
@@ -177,7 +182,7 @@ class AiAuthScriptGeneratorUnitTest {
             AiAuthAction action =
                     new AiAuthAction(AiAuthActionType.CLICK, List.of("#missing"), null);
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(false));
         }
@@ -191,11 +196,75 @@ class AiAuthScriptGeneratorUnitTest {
                             List.of("#password"),
                             AiAuthTurnPayload.PASSWORD_PLACEHOLDER);
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             verify(webElement).sendKeys(PASSWORD);
             assertThat(result.success(), is(true));
             assertThat(result.value(), is(equalTo(AiAuthTurnPayload.PASSWORD_PLACEHOLDER)));
+        }
+
+        @Test
+        void shouldSendWholeTotpCode() {
+            when(wd.findElements(By.cssSelector("#code"))).thenReturn(List.of(webElement));
+            AiAuthAction action =
+                    new AiAuthAction(
+                            AiAuthActionType.SEND_KEYS,
+                            List.of("#code"),
+                            AiAuthTurnPayload.TOTP_PLACEHOLDER);
+
+            AiAuthActionResult result = generator.executeAction(wd, action, TOTP_CREDS);
+
+            verify(webElement).sendKeys(TOTP_CODE);
+            assertThat(result.success(), is(true));
+            assertThat(result.value(), is(equalTo(AiAuthTurnPayload.TOTP_PLACEHOLDER)));
+        }
+
+        @Test
+        void shouldSendSingleTotpDigit() {
+            when(wd.findElements(By.cssSelector("#d3"))).thenReturn(List.of(webElement));
+            AiAuthAction action =
+                    new AiAuthAction(
+                            AiAuthActionType.SEND_KEYS,
+                            List.of("#d3"),
+                            AiAuthTurnPayload.totpDigitPlaceholder(3));
+
+            AiAuthActionResult result = generator.executeAction(wd, action, TOTP_CREDS);
+
+            verify(webElement).sendKeys("3");
+            assertThat(result.success(), is(true));
+            assertThat(result.value(), is(equalTo("{{totp3}}")));
+        }
+
+        @Test
+        void shouldFailTotpDigitOutOfRange() {
+            when(wd.findElements(By.cssSelector("#d7"))).thenReturn(List.of(webElement));
+            AiAuthAction action =
+                    new AiAuthAction(
+                            AiAuthActionType.SEND_KEYS,
+                            List.of("#d7"),
+                            AiAuthTurnPayload.totpDigitPlaceholder(7));
+
+            AiAuthActionResult result = generator.executeAction(wd, action, TOTP_CREDS);
+
+            verify(webElement, never()).sendKeys(any(CharSequence.class));
+            assertThat(result.success(), is(false));
+            assertThat(result.error(), containsString("6 digits"));
+        }
+
+        @Test
+        void shouldFailTotpWhenNotConfigured() {
+            when(wd.findElements(By.cssSelector("#code"))).thenReturn(List.of(webElement));
+            AiAuthAction action =
+                    new AiAuthAction(
+                            AiAuthActionType.SEND_KEYS,
+                            List.of("#code"),
+                            AiAuthTurnPayload.TOTP_PLACEHOLDER);
+
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
+
+            verify(webElement, never()).sendKeys(any(CharSequence.class));
+            assertThat(result.success(), is(false));
+            assertThat(result.error(), containsString("no TOTP data"));
         }
 
         @Test
@@ -207,7 +276,7 @@ class AiAuthScriptGeneratorUnitTest {
             AiAuthAction action =
                     new AiAuthAction(AiAuthActionType.SELECT, List.of("#domain"), "Project1");
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(false));
         }
@@ -216,7 +285,7 @@ class AiAuthScriptGeneratorUnitTest {
         void shouldWaitForGivenSeconds() {
             AiAuthAction action = new AiAuthAction(AiAuthActionType.WAIT, null, "0");
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(true));
         }
@@ -225,7 +294,7 @@ class AiAuthScriptGeneratorUnitTest {
         void shouldFailOnInvalidWaitValue() {
             AiAuthAction action = new AiAuthAction(AiAuthActionType.WAIT, null, "not-a-number");
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(false));
         }
@@ -238,7 +307,7 @@ class AiAuthScriptGeneratorUnitTest {
                             null,
                             String.valueOf(AiAuthScriptGenerator.MAX_WAIT_SECONDS));
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(true));
         }
@@ -253,7 +322,7 @@ class AiAuthScriptGeneratorUnitTest {
                             null,
                             String.valueOf(AiAuthScriptGenerator.MAX_WAIT_SECONDS + 1));
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(false));
         }
@@ -264,7 +333,7 @@ class AiAuthScriptGeneratorUnitTest {
                     new AiAuthAction(
                             AiAuthActionType.WAIT, null, String.valueOf(Integer.MAX_VALUE));
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(false));
         }
@@ -273,7 +342,7 @@ class AiAuthScriptGeneratorUnitTest {
         void shouldFailWhenWaitIsNegative() {
             AiAuthAction action = new AiAuthAction(AiAuthActionType.WAIT, null, "-1");
 
-            AiAuthActionResult result = generator.executeAction(wd, action, USERNAME, PASSWORD);
+            AiAuthActionResult result = generator.executeAction(wd, action, CREDS);
 
             assertThat(result.success(), is(false));
         }
@@ -294,8 +363,65 @@ class AiAuthScriptGeneratorUnitTest {
         }
 
         @Test
+        void shouldNotSendTotpToLlmWhenNotConfigured() throws Exception {
+            stubLlmResponse(
+                    """
+                    { "state": "FAILURE", "reasoning": "stop", "actions": [],
+                      "successIndicator": null }
+                    """);
+
+            generator.run(wd, USERNAME, PASSWORD);
+
+            String payload = capturedPayload();
+            assertThat(payload, not(containsString("totp")));
+        }
+
+        @Test
+        void shouldSendTotpPlaceholderAndDigitsToLlmWhenConfigured() throws Exception {
+            AiAuthScriptGenerator withTotp =
+                    new AiAuthScriptGenerator(config, llm, null, () -> TOTP_CODE);
+            stubLlmResponse(
+                    """
+                    { "state": "FAILURE", "reasoning": "stop", "actions": [],
+                      "successIndicator": null }
+                    """);
+
+            withTotp.run(wd, USERNAME, PASSWORD);
+
+            String payload = capturedPayload();
+            assertThat(payload, containsString("\"totp\":\"{{totp}}\""));
+            assertThat(payload, containsString("\"totpDigits\":6"));
+            assertThat(payload, not(containsString(TOTP_CODE)));
+        }
+
+        @Test
+        void shouldReportMissingTotpWhenMfaRequired() throws Exception {
+            given(Constant.messages.getString("authhelper.auth.method.ai.chat.mfa.nototp"))
+                    .willReturn("No TOTP");
+            LlmChatTabPanel chatTab = mock(LlmChatTabPanel.class);
+            AiAuthScriptGenerator withChatTab = new AiAuthScriptGenerator(config, llm, chatTab);
+            stubLlmResponse(
+                    """
+                    { "state": "MFA_REQUIRED", "reasoning": "code needed", "actions": [],
+                      "successIndicator": null }
+                    """);
+
+            AiAuthResult result = withChatTab.run(wd, USERNAME, PASSWORD);
+
+            assertThat(result.finalState(), is(AiAuthState.MFA_REQUIRED));
+            verify(chatTab).appendToOutput(eq(LlmChatTabPanel.ERROR_LABEL), eq("No TOTP"));
+        }
+
+        private String capturedPayload() throws Exception {
+            ArgumentCaptor<ChatRequest> captor = ArgumentCaptor.forClass(ChatRequest.class);
+            verify(llm).chatWithoutMemory(captor.capture());
+            return ((UserMessage) captor.getValue().messages().get(1)).singleText();
+        }
+
+        @Test
         void shouldReturnFailureWhenLlmReturnsNoParseableResponse() throws Exception {
-            given(llm.chat(any(ChatRequest.class))).willThrow(new RuntimeException("boom"));
+            given(llm.chatWithoutMemory(any(ChatRequest.class)))
+                    .willThrow(new RuntimeException("boom"));
 
             AiAuthResult result = generator.run(wd, USERNAME, PASSWORD);
 
@@ -348,6 +474,102 @@ class AiAuthScriptGeneratorUnitTest {
 
             assertThat(result.success(), is(true));
             assertThat(result.finalState(), is(AiAuthState.SUCCESS));
+        }
+
+        @Test
+        void shouldRecordActionsOnDifferentPages() throws Exception {
+            when(wd.getCurrentUrl())
+                    .thenReturn(
+                            "http://localhost/login",
+                            "http://localhost/password",
+                            "http://localhost/home");
+            when(wd.findElements(any(By.class))).thenReturn(List.of(mock(WebElement.class)));
+            stubLlmResponses(
+                    sendKeysTurn("#user", "{{username}}"),
+                    sendKeysTurn("#password", "{{password}}"),
+                    SUCCESS_TURN);
+
+            generator.run(wd, USERNAME, PASSWORD);
+
+            assertThat(
+                    generator.getSuccessfulActions().stream()
+                            .map(AiAuthActionResult::usedSelector)
+                            .toList(),
+                    contains("#user", "#password"));
+        }
+
+        @Test
+        void shouldSendActionsCompletedInEarlierTurns() throws Exception {
+            when(wd.getCurrentUrl())
+                    .thenReturn(
+                            "http://localhost/login",
+                            "http://localhost/password",
+                            "http://localhost/home");
+            when(wd.findElements(any(By.class))).thenReturn(List.of(mock(WebElement.class)));
+            stubLlmResponses(
+                    sendKeysTurn("#user", "{{username}}"),
+                    sendKeysTurn("#password", "{{password}}"),
+                    SUCCESS_TURN);
+
+            generator.run(wd, USERNAME, PASSWORD);
+
+            ArgumentCaptor<ChatRequest> captor = ArgumentCaptor.forClass(ChatRequest.class);
+            verify(llm, times(3)).chatWithoutMemory(captor.capture());
+            String lastPayload =
+                    ((UserMessage) captor.getAllValues().get(2).messages().get(1)).singleText();
+            assertThat(
+                    lastPayload,
+                    containsString(
+                            "\"completedActions\":[{\"type\":\"SEND_KEYS\",\"usedSelector\":\"#user\","));
+            assertThat(lastPayload, containsString("\"usedSelector\":\"#password\""));
+            assertThat(
+                    lastPayload,
+                    containsString(
+                            "\"previousActions\":[{\"type\":\"SEND_KEYS\",\"usedSelector\":\"#password\","));
+        }
+
+        @Test
+        void shouldDiscardActionsRecordedBeforePageWasShownAgain() throws Exception {
+            when(wd.getCurrentUrl())
+                    .thenReturn(
+                            "http://localhost/login",
+                            "http://localhost/code",
+                            "http://localhost/login",
+                            "http://localhost/code",
+                            "http://localhost/home");
+            when(wd.findElements(any(By.class))).thenReturn(List.of(mock(WebElement.class)));
+            stubLlmResponses(
+                    sendKeysTurn("#user", "{{username}}"),
+                    sendKeysTurn("#code", "{{totp}}"),
+                    sendKeysTurn("#user2", "{{username}}"),
+                    sendKeysTurn("#code2", "{{totp}}"),
+                    SUCCESS_TURN);
+            LlmChatTabPanel chatTab = mock(LlmChatTabPanel.class);
+            given(Constant.messages.getString("authhelper.auth.method.ai.chat.discarded", 1, 2))
+                    .willReturn("Discarded");
+            generator = new AiAuthScriptGenerator(config, llm, chatTab, () -> TOTP_CODE);
+
+            generator.run(wd, USERNAME, PASSWORD);
+
+            assertThat(
+                    generator.getSuccessfulActions().stream()
+                            .map(AiAuthActionResult::usedSelector)
+                            .toList(),
+                    contains("#user2", "#code2"));
+            verify(chatTab).appendToOutput(eq(LlmChatTabPanel.USER_LABEL), eq("Discarded"));
+        }
+
+        @Test
+        void shouldTypeTotpCodeObtainedAfterLlmResponse() throws Exception {
+            WebElement codeField = mock(WebElement.class);
+            when(wd.findElements(By.cssSelector("#code"))).thenReturn(List.of(codeField));
+            stubLlmResponses(sendKeysTurn("#code", "{{totp}}"), SUCCESS_TURN);
+            Iterator<String> codes = List.of("111111", "222222", "333333").iterator();
+            generator = new AiAuthScriptGenerator(config, llm, null, codes::next);
+
+            generator.run(wd, USERNAME, PASSWORD);
+
+            verify(codeField).sendKeys("222222");
         }
 
         @Test

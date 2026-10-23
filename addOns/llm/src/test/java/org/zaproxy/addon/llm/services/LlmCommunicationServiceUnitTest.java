@@ -20,9 +20,11 @@
 package org.zaproxy.addon.llm.services;
 
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.contains;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.sameInstance;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
@@ -115,6 +117,29 @@ class LlmCommunicationServiceUnitTest {
         assertThat(followUp.get(1), is(equalTo(UserMessage.from("Please review this alert."))));
         assertThat(followUp.get(2), is(equalTo(AiMessage.from("reviewed"))));
         assertThat(followUp.get(3), is(equalTo(UserMessage.from("summarise that"))));
+    }
+
+    @Test
+    void shouldNotUseOrRetainHistoryWhenChattingWithoutMemory() {
+        // Given
+        given(model.chat(any(ChatRequest.class)))
+                .willReturn(aiResponse("first reply"), aiResponse("second reply"));
+        service.chat(ChatRequest.builder().messages(UserMessage.from("hello")).build());
+        ChatRequest standalone =
+                ChatRequest.builder()
+                        .messages(SystemMessage.from("Reply with JSON."), UserMessage.from("turn"))
+                        .build();
+
+        // When
+        service.chatWithoutMemory(standalone);
+
+        // Then
+        ArgumentCaptor<ChatRequest> captor = ArgumentCaptor.forClass(ChatRequest.class);
+        verify(model, times(2)).chat(captor.capture());
+        assertThat(captor.getAllValues().get(1), is(sameInstance(standalone)));
+        assertThat(
+                chatMemory.messages(),
+                contains(UserMessage.from("hello"), AiMessage.from("first reply")));
     }
 
     @Test

@@ -78,11 +78,13 @@ Note the TOTP data is defined under the user credentials:
         username: …
         password: …
         totp:
-          secret:          # String, the secret.
+          secret:          # String, the secret, or the code itself for the FIXED algorithm.
           period:          # Int, the period. Default: 30
           digits:          # Int, the number of digits. Default: 6
-          algorithm:       # String, the algorithm. Default: SHA1
+          algorithm:       # String, the algorithm, one of SHA1, SHA256, SHA512, FIXED. Default: SHA1
 </pre>
+The <code>FIXED</code> algorithm is for applications that accept a static code (for example <code>1234</code> in test and demo
+applications): the code is set as the secret and used as is.
 
 <H2>AJAX Spider Integration</H2>
 

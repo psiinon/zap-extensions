@@ -23,7 +23,7 @@ import java.io.IOException;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.openqa.selenium.WebDriver;
-import org.zaproxy.addon.commonlib.internal.TotpSupport;
+import org.zaproxy.addon.commonlib.internal.TotpVariables;
 import org.zaproxy.zap.users.User;
 import org.zaproxy.zest.core.v1.ZestActionFailException;
 import org.zaproxy.zest.core.v1.ZestAssertFailException;
@@ -43,11 +43,9 @@ public class ZestAuthRunner extends ZestBasicRunner {
 
     private static final Logger LOGGER = LogManager.getLogger(ZestAuthRunner.class);
 
-    private static final String TOTP_VAR_NAME = "TOTP";
-
     private WebDriver webDriver;
 
-    private String totpVar;
+    private TotpVariables totpVariables;
     private User user;
 
     public ZestAuthRunner() {
@@ -60,10 +58,10 @@ public class ZestAuthRunner extends ZestBasicRunner {
 
     public void setup(User user, ZestScript script) {
         this.user = user;
-        totpVar =
-                script.getParameters().getTokenStart()
-                        + TOTP_VAR_NAME
-                        + script.getParameters().getTokenEnd();
+        totpVariables =
+                new TotpVariables(
+                        script.getParameters().getTokenStart(),
+                        script.getParameters().getTokenEnd());
     }
 
     @Override
@@ -93,10 +91,10 @@ public class ZestAuthRunner extends ZestBasicRunner {
                     IOException,
                     ZestAssignFailException,
                     ZestClientFailException {
-        if (stmt instanceof ZestClientElementSendKeys sendKeys
-                && totpVar.equals(sendKeys.getValue())) {
-            String code = TotpSupport.getCode(user.getAuthenticationCredentials());
-            setVariable(TOTP_VAR_NAME, code);
+        if (stmt instanceof ZestClientElementSendKeys sendKeys) {
+            totpVariables
+                    .getVariables(sendKeys.getValue(), user.getAuthenticationCredentials())
+                    .forEach(this::setVariable);
         }
         return super.runStatement(script, stmt, lastResponse);
     }

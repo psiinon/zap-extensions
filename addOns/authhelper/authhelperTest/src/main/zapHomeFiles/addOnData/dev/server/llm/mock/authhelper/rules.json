@@ -5,7 +5,151 @@
       "state": "SUCCESS",
       "reasoning": "The browser is on the home page, which is only shown after login.",
       "actions": [],
-      "successIndicator": {"type": "URL_PATTERN", "value": "multi-step-auth/home"}
+      "successIndicator": {
+        "type": "URL_PATTERN",
+        "value": "multi-step-auth/home"
+      }
+    }
+  },
+  {
+    "match": "^(?!.*\"totp\"\\s*:\\s*\"\\{\\{totp\\}\\}\").*\"url\"\\s*:\\s*\"[^\"]*/auth/multi-step-auth/totp",
+    "reply": {
+      "state": "MFA_REQUIRED",
+      "reasoning": "Step 4 asks for a one-time code but the user has no TOTP credential, so I cannot continue.",
+      "actions": [],
+      "successIndicator": null
+    }
+  },
+  {
+    "match": "\"url\"\\s*:\\s*\"[^\"]*/auth/multi-step-auth/totp.*#digits > input:nth-of-type\\(6\\)",
+    "reply": {
+      "state": "IN_PROGRESS",
+      "reasoning": "Step 4 asks for the one-time code in 6 boxes, so I will type one digit in each and verify.",
+      "actions": [
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(1)"
+          ],
+          "value": "{{totp1}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(2)"
+          ],
+          "value": "{{totp2}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(3)"
+          ],
+          "value": "{{totp3}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(4)"
+          ],
+          "value": "{{totp4}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(5)"
+          ],
+          "value": "{{totp5}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(6)"
+          ],
+          "value": "{{totp6}}"
+        },
+        {
+          "type": "CLICK",
+          "selectors": [
+            "#verify",
+            "button"
+          ],
+          "value": null
+        }
+      ],
+      "successIndicator": null
+    }
+  },
+  {
+    "match": "\"url\"\\s*:\\s*\"[^\"]*/auth/multi-step-auth/totp.*#digits > input:nth-of-type\\(4\\)",
+    "reply": {
+      "state": "IN_PROGRESS",
+      "reasoning": "Step 4 asks for the one-time code in 4 boxes, so I will type one digit in each and verify.",
+      "actions": [
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(1)"
+          ],
+          "value": "{{totp1}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(2)"
+          ],
+          "value": "{{totp2}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(3)"
+          ],
+          "value": "{{totp3}}"
+        },
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#digits > input:nth-of-type(4)"
+          ],
+          "value": "{{totp4}}"
+        },
+        {
+          "type": "CLICK",
+          "selectors": [
+            "#verify",
+            "button"
+          ],
+          "value": null
+        }
+      ],
+      "successIndicator": null
+    }
+  },
+  {
+    "match": "\"url\"\\s*:\\s*\"[^\"]*/auth/multi-step-auth/totp",
+    "reply": {
+      "state": "IN_PROGRESS",
+      "reasoning": "Step 4 asks for the one-time code, so I will enter it and verify.",
+      "actions": [
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#code",
+            "[name='code']"
+          ],
+          "value": "{{totp}}"
+        },
+        {
+          "type": "CLICK",
+          "selectors": [
+            "#verify",
+            "button"
+          ],
+          "value": null
+        }
+      ],
+      "successIndicator": null
     }
   },
   {
@@ -14,8 +158,22 @@
       "state": "IN_PROGRESS",
       "reasoning": "Step 3 asks for the password, so I will enter it and sign in.",
       "actions": [
-        {"type": "SEND_KEYS", "selectors": ["#password", "[name='password']"], "value": "{{password}}"},
-        {"type": "CLICK", "selectors": ["#signin", "button"], "value": null}
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#password",
+            "[name='password']"
+          ],
+          "value": "{{password}}"
+        },
+        {
+          "type": "CLICK",
+          "selectors": [
+            "#signin",
+            "button"
+          ],
+          "value": null
+        }
       ],
       "successIndicator": null
     }
@@ -26,8 +184,22 @@
       "state": "IN_PROGRESS",
       "reasoning": "Step 2 asks for a department, so I will pick one and continue.",
       "actions": [
-        {"type": "SELECT", "selectors": ["#department", "[name='department']"], "value": "Engineering"},
-        {"type": "CLICK", "selectors": ["#next", "button"], "value": null}
+        {
+          "type": "SELECT",
+          "selectors": [
+            "#department",
+            "[name='department']"
+          ],
+          "value": "Engineering"
+        },
+        {
+          "type": "CLICK",
+          "selectors": [
+            "#next",
+            "button"
+          ],
+          "value": null
+        }
       ],
       "successIndicator": null
     }
@@ -38,9 +210,30 @@
       "state": "IN_PROGRESS",
       "reasoning": "Step 1 asks for the username and domain, so I will enter the username, select Project1 and continue.",
       "actions": [
-        {"type": "SEND_KEYS", "selectors": ["#user", "[name='user']"], "value": "{{username}}"},
-        {"type": "SELECT", "selectors": ["#domain", "[name='domain']"], "value": "Project1"},
-        {"type": "CLICK", "selectors": ["#next", "button"], "value": null}
+        {
+          "type": "SEND_KEYS",
+          "selectors": [
+            "#user",
+            "[name='user']"
+          ],
+          "value": "{{username}}"
+        },
+        {
+          "type": "SELECT",
+          "selectors": [
+            "#domain",
+            "[name='domain']"
+          ],
+          "value": "Project1"
+        },
+        {
+          "type": "CLICK",
+          "selectors": [
+            "#next",
+            "button"
+          ],
+          "value": null
+        }
       ],
       "successIndicator": null
     }

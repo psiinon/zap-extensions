@@ -35,6 +35,7 @@ import static org.mockito.Mockito.when;
 
 import net.sf.json.JSONObject;
 import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -50,6 +51,8 @@ import org.parosproxy.paros.model.Session;
 import org.zaproxy.addon.authhelper.llm.AiAssistedAuthenticationMethodType.AiAssistedAuthenticationMethod;
 import org.zaproxy.addon.llm.ExtensionLlm;
 import org.zaproxy.zap.authentication.AuthenticationMethod;
+import org.zaproxy.zap.authentication.TotpAuthenticationCredentials;
+import org.zaproxy.zap.authentication.TotpAuthenticationCredentials.TotpGenerator;
 import org.zaproxy.zap.extension.api.ApiDynamicActionImplementor;
 import org.zaproxy.zap.extension.api.ApiResponse;
 import org.zaproxy.zap.model.Context;
@@ -82,6 +85,32 @@ class AiAssistedAuthenticationMethodTypeUnitTest {
         void shouldNotIdentifyOtherMethodTypes() {
             AiAssistedAuthenticationMethodType type = new AiAssistedAuthenticationMethodType();
             assertThat(type.isTypeForMethod(mock(AuthenticationMethod.class)), is(false));
+        }
+    }
+
+    @Nested
+    class Credentials {
+
+        @AfterEach
+        void cleanUp() {
+            TotpAuthenticationCredentials.setTotpGenerator(null);
+        }
+
+        @Test
+        void shouldCreateTotpEnabledCredentials() {
+            TotpAuthenticationCredentials.setTotpGenerator(mock(TotpGenerator.class));
+            AiAssistedAuthenticationMethodType type = new AiAssistedAuthenticationMethodType();
+
+            assertThat(type.createAuthenticationCredentials().isTotpEnabled(), is(true));
+            assertThat(
+                    type.createAuthenticationMethod(0).createAuthenticationCredentials(),
+                    is(instanceOf(TotpAuthenticationCredentials.class)));
+            assertThat(
+                    ((TotpAuthenticationCredentials)
+                                    type.createAuthenticationMethod(0)
+                                            .createAuthenticationCredentials())
+                            .isTotpEnabled(),
+                    is(true));
         }
     }
 
